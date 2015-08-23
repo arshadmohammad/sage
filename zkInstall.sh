@@ -114,10 +114,10 @@ do
     jmx_port=$(($JMX_PORT_BASE + $i - 1))
     echo "export JMXPORT=\"$jmx_port\"" >> $env_file  
        
-    
+    server_file=$INSTANCES/zookeeper$i/bin/zkServer.sh
     debug_port=$(($DEBUG_PORT_BASE + $i - 1))
     debug_options="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
-    echo "export SERVER_JVMFLAGS=\"$debug_options $SERVER_JVMFLAGS\"" >> $env_file 
+    sed -i "s|nohup \"\$JAVA\" \$ZOO_DATADIR_AUTOCREATE|nohup \"\$JAVA\" \$ZOO_DATADIR_AUTOCREATE $debug_options|" $server_file    
     
     
     
