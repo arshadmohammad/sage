@@ -11,13 +11,10 @@ NAMENODE_HTTP_ADDRESS_BASE=50070
 DATANODE_HTTP_ADDRESS_BASE=50075
 DATANODE_ADDRESS_BASE=50010
 DATANODE_IPC_ADDRESS_BASE=50020
-CLIENT_PORT_BASE=2181
-CLIENT_SECURE_PORT_BASE=3181
-PEER_COM_PORT_BASE=2888
-LEADER_ELEC_PORT_BASE=3888
-ADMIN_SERVER_PORT_BASE=8088
-JMX_PORT_BASE=9088
-DEBUG_PORT_BASE=4444
+NAMENODE_JMX_PORT_BASE=8004
+DATANODE_JMX_PORT_BASE=8010
+NAMENODE_DEBUG_PORT_BASE=4400
+DATANODE_DEBUG_PORT_BASE=4410
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 
@@ -46,6 +43,7 @@ do
     node_data_dir=$DATAS/dataNodeData$i
     core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
     hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
+    hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
     defaultFS="\t<property>\n\t\t<name>fs.defaultFS</name>\n\t\t<value>hdfs://localhost:$HDFS_CLIENT_PORT_BASE</value>\n\t</property>\n</configuration>"
     sed -i "s|</configuration>|$defaultFS|" $core_site_xml    
     
@@ -72,9 +70,20 @@ do
     sed -i "s|</configuration>|$data_node_add_prop|" $hdfs_site_xml 
     
     data_node_ipc_port=$(($DATANODE_IPC_ADDRESS_BASE + $i - 1))
-    data_node_ipc_add_prop="\t<property>\n\t\t<name>dfs.datanode.address</name>\n\t\t<value>0.0.0.0:$data_node_ipc_port</value>\n\t</property>\n</configuration>"
+    data_node_ipc_add_prop="\t<property>\n\t\t<name>dfs.datanode.ipc.address</name>\n\t\t<value>0.0.0.0:$data_node_ipc_port</value>\n\t</property>\n</configuration>"
     sed -i "s|</configuration>|$data_node_ipc_add_prop|" $hdfs_site_xml
     
+    
+    
+    #Env configuration
+    pidDir=$node_data_dir/pid
+    mkdir $pidDir
+    echo "HADOOP_PID_DIR=$pidDir" >> $hadoop_env
+    
+    jmx_port=$(($DATANODE_JMX_PORT_BASE + $i - 1))
+    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $HADOOP_DATANODE_OPTS"
+    echo "export HADOOP_DATANODE_OPTS=\"$jmx_prop\"" >> $hadoop_env
+        
 done
 
 }
@@ -87,6 +96,7 @@ do
     node_data_dir=$DATAS/nameNodeData$i
     core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
     hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
+    hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
     defaultFS="\t<property>\n\t\t<name>fs.defaultFS</name>\n\t\t<value>hdfs://localhost:$HDFS_CLIENT_PORT_BASE</value>\n\t</property>\n</configuration>"
     sed -i "s|</configuration>|$defaultFS|" $core_site_xml    
     
@@ -112,6 +122,16 @@ do
     http_port=$(($NAMENODE_HTTP_ADDRESS_BASE + $i - 1))
     http_address_prop="\t<property>\n\t\t<name>dfs.namenode.http-address</name>\n\t\t<value>0.0.0.0:$http_port</value>\n\t</property>\n</configuration>"
     sed -i "s|</configuration>|$http_address_prop|" $hdfs_site_xml
+    
+    #Env configuration
+    pidDir=$node_data_dir/pid
+    mkdir $pidDir
+    echo "export HADOOP_PID_DIR=$pidDir" >> $hadoop_env
+    
+    jmx_port=$(($NAMENODE_JMX_PORT_BASE + $i - 1))
+    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $HADOOP_NAMENODE_OPTS"
+    echo "export HADOOP_NAMENODE_OPTS=\"$jmx_prop\"" >> $hadoop_env
+    
 done
 
 }
@@ -213,7 +233,7 @@ start_data_node()
 {
 for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
 do
-   node_instance_dir=$INSTANCES/dataNode$i   
+   node_instance_dir=$INSTANCES/dataNode$i
    $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs start datanode
 done   
 }
@@ -221,10 +241,26 @@ done
 
 stop_()
 {
-    for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
-    do
-        $INSTANCES/zookeeper$i/bin/zkServer.sh stop
-    done
+stop_name_node
+stop_data_node
+}
+
+stop_name_node()
+{
+for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
+do
+   node_instance_dir=$INSTANCES/nameNode$i   
+   $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs stop namenode
+done 
+}
+stop_data_node()
+{
+for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
+do
+   node_instance_dir=$INSTANCES/dataNode$i 
+   $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs stop datanode
+done 
+
 }
 
 restart_()
