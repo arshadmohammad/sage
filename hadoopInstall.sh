@@ -40,33 +40,33 @@ INSTANCES=$INSTALLATION_BASE_DIR/instances
 
 install_()
 {
-    #Prepare installation directory structure
-    rm -r $INSTALLATION_BASE_DIR
-    mkdir $INSTALLATION_BASE_DIR
-    mkdir $DATAS
-    mkdir $INSTANCES
-    stop_
-    extract_hadoop
-    configure_hadoop
+  #Prepare installation directory structure
+  stop_
+  rm -r $INSTALLATION_BASE_DIR
+  mkdir $INSTALLATION_BASE_DIR
+  mkdir $DATAS
+  mkdir $INSTANCES    
+  extract_hadoop
+  configure_hadoop
 }
 extract_hadoop()
 {
-    extractModule "nameNode" $NUMBER_OF_NAMENODE
-    extractModule "dataNode" $NUMBER_OF_DATANODE
-    extractModule "resourceManager" $NUMBER_OF_RESOURCEMANAGER
-    extractModule "nodeManager" $NUMBER_OF_NODEMANAGER    
+  extractModule "nameNode" $NUMBER_OF_NAMENODE
+  extractModule "dataNode" $NUMBER_OF_DATANODE
+  extractModule "resourceManager" $NUMBER_OF_RESOURCEMANAGER
+  extractModule "nodeManager" $NUMBER_OF_NODEMANAGER    
 }
 extractModule()
 {
-module=$1
-count=$2
-println "Extracting $module"
-for (( i=1; i<=$count; i++ ))
-do
+  module=$1
+  count=$2
+  println "Extracting $module"
+  for (( i=1; i<=$count; i++ ))
+  do
     #create module directory and extract release to this
     node_instance_dir=$INSTANCES/$module$i
     if [ -d $node_instance_dir ]; then
-        rm -r $node_instance_dir
+      rm -r $node_instance_dir
     fi    
     mkdir $node_instance_dir
     tar -mxf $HADOOP_RELEASE -C $node_instance_dir --strip-components 1 
@@ -75,18 +75,29 @@ do
     data="Data"
     node_data_dir=$DATAS/$module$data$i
     if [ -d $node_data_dir ]; then
-        rm -r $node_data_dir
+      rm -r $node_data_dir
     fi 
     mkdir $node_data_dir
-done
+  done
+}
+# file, key, value
+addXMLProperty()
+{
+  property_xml="\t<property>\n\t\t<name>$2</name>\n\t\t<value>$3</value>\n\t</property>\n</configuration>"
+  sed -i "s|</configuration>|$property_xml|" $1
+}
+# file, key, value
+addProperty()
+{
+  echo "export $2=$3" >> $1  
 }
 
 configure_hadoop()
 {
-    configure_namenode
-    configure_datanode
-    configure_resourcemanager
-    configure_nodemanager
+  configure_namenode
+  configure_datanode
+  configure_resourcemanager
+  configure_nodemanager
 }
 
 configure_namenode()
@@ -100,44 +111,37 @@ do
     hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
     hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
     name_node_rpc_port=$(($NAMENODE_IPC_ADDRESS_BASE + $i - 1))
-    defaultFS="\t<property>\n\t\t<name>fs.defaultFS</name>\n\t\t<value>hdfs://localhost:$name_node_rpc_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$defaultFS|" $core_site_xml    
+    
+    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://localhost:$name_node_rpc_port"  
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
-    tempDirProp="\t<property>\n\t\t<name>hadoop.tmp.dir</name>\n\t\t<value>$tempDir</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$tempDirProp|" $core_site_xml
-    
-    
-    replication="\t<property>\n\t\t<name>dfs.replication</name>\n\t\t<value>$REPLICATION</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$replication|" $hdfs_site_xml 
+    addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir" 
+     
+    addXMLProperty $hdfs_site_xml "dfs.replication" "$REPLICATION"
     
     nameDir=$node_data_dir/name
     mkdir $nameDir
-    nameDirProp="\t<property>\n\t\t<name>dfs.namenode.name.dir</name>\n\t\t<value>$nameDir</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$nameDirProp|" $hdfs_site_xml 
+    addXMLProperty $hdfs_site_xml "dfs.namenode.name.dir" "$nameDir"    
 
     editDir=$node_data_dir/edit
     mkdir $editDir
-    editDirProp="\t<property>\n\t\t<name>dfs.namenode.edits.dir</name>\n\t\t<value>$editDir</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$editDirProp|" $hdfs_site_xml
+    addXMLProperty $hdfs_site_xml "dfs.namenode.edits.dir" "$editDir"
 
     http_port=$(($NAMENODE_HTTP_ADDRESS_BASE + $i - 1))
-    http_address_prop="\t<property>\n\t\t<name>dfs.namenode.http-address</name>\n\t\t<value>0.0.0.0:$http_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$http_address_prop|" $hdfs_site_xml
+    addXMLProperty $hdfs_site_xml "dfs.namenode.http-address" "0.0.0.0:$http_port"
     
     #Env configuration
     pidDir=$node_data_dir/pid
     mkdir $pidDir
-    echo "export HADOOP_PID_DIR=$pidDir" >> $hadoop_env
+    addProperty $hadoop_env "HADOOP_PID_DIR" "$pidDir"
     
     jmx_port=$(($NAMENODE_JMX_PORT_BASE + $i - 1))
     jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $HADOOP_NAMENODE_OPTS"
-    echo "export HADOOP_NAMENODE_OPTS=\"$jmx_prop\"" >> $hadoop_env
-    
+    addProperty $hadoop_env "HADOOP_NAMENODE_OPTS" "\"$jmx_prop\""
 done
-
 }
+
 configure_datanode()
 {
 println "Configure data node"
@@ -148,48 +152,39 @@ do
     core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
     hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
     hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
-    defaultFS="\t<property>\n\t\t<name>fs.defaultFS</name>\n\t\t<value>hdfs://localhost:$NAMENODE_IPC_ADDRESS_BASE</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$defaultFS|" $core_site_xml    
+    
+    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://localhost:$NAMENODE_IPC_ADDRESS_BASE"  
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
-    tempDirProp="\t<property>\n\t\t<name>hadoop.tmp.dir</name>\n\t\t<value>$tempDir</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$tempDirProp|" $core_site_xml
+    addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir"    
     
-    
-    replication="\t<property>\n\t\t<name>dfs.replication</name>\n\t\t<value>$REPLICATION</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$replication|" $hdfs_site_xml 
+    addXMLProperty $hdfs_site_xml "dfs.replication" "$REPLICATION"
     
     dataDir=$node_data_dir/data
     mkdir $dataDir
-    dataDirProp="\t<property>\n\t\t<name>dfs.datanode.data.dir</name>\n\t\t<value>$dataDir</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$dataDirProp|" $hdfs_site_xml
+    addXMLProperty $hdfs_site_xml "dfs.datanode.data.dir" "$dataDir"
 
     http_port=$(($DATANODE_HTTP_ADDRESS_BASE + $i - 1))
-    http_address_prop="\t<property>\n\t\t<name>dfs.datanode.http.address</name>\n\t\t<value>0.0.0.0:$http_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$http_address_prop|" $hdfs_site_xml
+    addXMLProperty $hdfs_site_xml "dfs.datanode.http.address" "0.0.0.0:$http_port"
 
     data_node_port=$(($DATANODE_ADDRESS_BASE + $i - 1))
-    data_node_add_prop="\t<property>\n\t\t<name>dfs.datanode.address</name>\n\t\t<value>0.0.0.0:$data_node_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$data_node_add_prop|" $hdfs_site_xml 
+    addXMLProperty $hdfs_site_xml "dfs.datanode.address" "0.0.0.0:$data_node_port"    
     
     data_node_ipc_port=$(($DATANODE_IPC_ADDRESS_BASE + $i - 1))
-    data_node_ipc_add_prop="\t<property>\n\t\t<name>dfs.datanode.ipc.address</name>\n\t\t<value>0.0.0.0:$data_node_ipc_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$data_node_ipc_add_prop|" $hdfs_site_xml
+    addXMLProperty $hdfs_site_xml "dfs.datanode.ipc.address" "0.0.0.0:$data_node_ipc_port"
     
     
     
     #Env configuration
     pidDir=$node_data_dir/pid
     mkdir $pidDir
-    echo "HADOOP_PID_DIR=$pidDir" >> $hadoop_env
+    addProperty $hadoop_env "HADOOP_PID_DIR" "$pidDir"
     
     jmx_port=$(($DATANODE_JMX_PORT_BASE + $i - 1))
     jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $HADOOP_DATANODE_OPTS"
-    echo "export HADOOP_DATANODE_OPTS=\"$jmx_prop\"" >> $hadoop_env
-        
+    addProperty $hadoop_env "HADOOP_DATANODE_OPTS" "\"$jmx_prop\""
 done
-
 }
 
 configure_resourcemanager()
@@ -202,49 +197,39 @@ do
     core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
     yarn_site_xml=$node_instance_dir/etc/hadoop/yarn-site.xml    
     yarn_env=$node_instance_dir/etc/hadoop/yarn-env.sh
-    defaultFS="\t<property>\n\t\t<name>fs.defaultFS</name>\n\t\t<value>hdfs://localhost:$NAMENODE_IPC_ADDRESS_BASE</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$defaultFS|" $core_site_xml    
+    
+    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://localhost:$NAMENODE_IPC_ADDRESS_BASE"  
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
-    tempDirProp="\t<property>\n\t\t<name>hadoop.tmp.dir</name>\n\t\t<value>$tempDir</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$tempDirProp|" $core_site_xml
-
-    resourcemanager_hostname=="\t<property>\n\t\t<name>yarn.resourcemanager.hostname</name>\n\t\t<value>0.0.0.0</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$resourcemanager_hostname|" $yarn_site_xml
+    addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir"
+    
+    addXMLProperty $yarn_site_xml "yarn.resourcemanager.hostname" "0.0.0.0"
     
     resourcemanager_port=$(($RESOURCEMANAGER_ADDRESS_BASE + $i - 1))
-    resourcemanager_port_prop="\t<property>\n\t\t<name>yarn.resourcemanager.address</name>\n\t\t<value>\${yarn.resourcemanager.hostname}:$resourcemanager_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$resourcemanager_port_prop|" $yarn_site_xml
+    addXMLProperty $yarn_site_xml "yarn.resourcemanager.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_port"
     
     resourcemanager_scheduler_port=$(($RESOURCEMANAGER_SCHEDULER_ADDRESS_BASE + $i - 1))
-    resourcemanager_scheduler_port_prop="\t<property>\n\t\t<name>yarn.resourcemanager.scheduler.address</name>\n\t\t<value>\${yarn.resourcemanager.hostname}:$resourcemanager_scheduler_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$resourcemanager_scheduler_port_prop|" $yarn_site_xml
+    addXMLProperty $yarn_site_xml "yarn.resourcemanager.scheduler.address" "localhost:$resourcemanager_scheduler_port"
     
     resourcemanager_resource_tracker_port=$(($RESOURCEMANAGER_RESOURCE_TRACKER_ADDRESS_BASE + $i - 1))
-    resourcemanager_resource_tracker_port_prop="\t<property>\n\t\t<name>yarn.resourcemanager.resource-tracker.address</name>\n\t\t<value>\${yarn.resourcemanager.hostname}:$resourcemanager_resource_tracker_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$resourcemanager_resource_tracker_port_prop|" $yarn_site_xml
+    addXMLProperty $yarn_site_xml "yarn.resourcemanager.resource-tracker.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_resource_tracker_port"
     
     resourcemanager_admin_address_port=$(($RESOURCEMANAGER_ADMIN_ADDRESS_BASE + $i - 1))
-    resourcemanager_admin_address_port_prop="\t<property>\n\t\t<name>yarn.resourcemanager.admin.address</name>\n\t\t<value>\${yarn.resourcemanager.hostname}:$resourcemanager_admin_address_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$resourcemanager_admin_address_port_prop|" $yarn_site_xml
+    addXMLProperty $yarn_site_xml "yarn.resourcemanager.admin.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_admin_address_port"
     
     resourcemanager_webapp_address_port=$(($RESOURCEMANAGER_WEBAPP_ADDRESS_BASE + $i - 1))
-    resourcemanager_webapp_address_port_prop="\t<property>\n\t\t<name>yarn.resourcemanager.webapp.address</name>\n\t\t<value>\${yarn.resourcemanager.hostname}:$resourcemanager_webapp_address_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$resourcemanager_webapp_address_port_prop|" $yarn_site_xml  
-    
+    addXMLProperty $yarn_site_xml "yarn.resourcemanager.webapp.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_webapp_address_port"
     
     #Env configuration
     pidDir=$node_data_dir/pid
     mkdir $pidDir
-    echo "YARN_PID_DIR=$pidDir" >> $yarn_env
+    addProperty $yarn_env "YARN_PID_DIR" "$pidDir"
     
     jmx_port=$(($RESOURCEMANAGER_JMX_PORT_BASE + $i - 1))
     jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $YARN_OPTS"
-    echo "export YARN_OPTS=\"$jmx_prop\"" >> $yarn_env
-        
+    addProperty $yarn_env "YARN_OPTS" "\"$jmx_prop\""
 done
-
 }
 configure_nodemanager()
 {
@@ -256,39 +241,32 @@ do
     core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
     yarn_site_xml=$node_instance_dir/etc/hadoop/yarn-site.xml    
     yarn_env=$node_instance_dir/etc/hadoop/yarn-env.sh
-    defaultFS="\t<property>\n\t\t<name>fs.defaultFS</name>\n\t\t<value>hdfs://localhost:$NAMENODE_IPC_ADDRESS_BASE</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$defaultFS|" $core_site_xml    
+    
+    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://localhost:$NAMENODE_IPC_ADDRESS_BASE"  
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
-    tempDirProp="\t<property>\n\t\t<name>hadoop.tmp.dir</name>\n\t\t<value>$tempDir</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$tempDirProp|" $core_site_xml
-
-    nodemanager_hostname=="\t<property>\n\t\t<name>yarn.nodemanager.hostname</name>\n\t\t<value>0.0.0.0</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$nodemanager_hostname|" $yarn_site_xml
+    addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir"
+    
+    addXMLProperty $yarn_site_xml "yarn.nodemanager.hostname" "0.0.0.0"
     
     nodemanager_address_port=$(($NODEMANAGER_ADDRESS_BASE + $i - 1))
-    nodemanager_address_prop="\t<property>\n\t\t<name>yarn.nodemanager.address</name>\n\t\t<value>\${yarn.nodemanager.hostname}:$nodemanager_address_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$nodemanager_address_prop|" $yarn_site_xml
+    addXMLProperty $yarn_site_xml "yarn.nodemanager.address" "\${yarn.nodemanager.hostname}:$nodemanager_address_port"
     
     nodemanager_localizer_address_port=$(($NODEMANAGER_LOCALIZER_ADDRESS_BASE + $i - 1))
-    nodemanager_localizer_address_port_prop="\t<property>\n\t\t<name>yarn.nodemanager.localizer.address</name>\n\t\t<value>\${yarn.nodemanager.hostname}:$nodemanager_localizer_address_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$nodemanager_localizer_address_port_prop|" $yarn_site_xml
+    addXMLProperty $yarn_site_xml "yarn.nodemanager.localizer.address" "\${yarn.nodemanager.hostname}:$nodemanager_localizer_address_port"
     
     nodemanager_webapp_address_port=$(($NODEMANAGER_WEBAPP_ADDRESS_BASE + $i - 1))
-    nodemanager_webapp_address_prop="\t<property>\n\t\t<name>yarn.nodemanager.webapp.address</name>\n\t\t<value>\${yarn.nodemanager.hostname}:$nodemanager_webapp_address_port</value>\n\t</property>\n</configuration>"
-    sed -i "s|</configuration>|$nodemanager_webapp_address_prop|" $yarn_site_xml   
-    
+    addXMLProperty $yarn_site_xml "yarn.nodemanager.webapp.address" "\${yarn.nodemanager.hostname}:$nodemanager_webapp_address_port"    
     
     #Env configuration
     pidDir=$node_data_dir/pid
     mkdir $pidDir
-    echo "YARN_PID_DIR=$pidDir" >> $yarn_env
+    addProperty $yarn_env "YARN_PID_DIR" "$pidDir"
     
     jmx_port=$(($NODEMANAGER_JMX_PORT_BASE + $i - 1))
     jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $YARN_OPTS"
-    echo "export YARN_OPTS=\"$jmx_prop\"" >> $yarn_env
-        
+    addProperty $yarn_env "YARN_OPTS" "\"$jmx_prop\""
 done
 }
 
@@ -318,137 +296,122 @@ for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
 }
 start_()
 {
-start_name_node
-start_data_node
-
-start_resourcemanager
-start_nodemanager
-
+  start_name_node
+  start_data_node
+  start_resourcemanager
+  start_nodemanager
 }
 start_name_node()
 {
-for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
-do
-   node_instance_dir=$INSTANCES/nameNode$i
-   $node_instance_dir/bin/hdfs namenode -format
-   $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs start namenode
-done   
+  for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
+  do
+     node_instance_dir=$INSTANCES/nameNode$i
+     node_data_dir=$DATAS/nameNodeData$i
+     #Formate name node only when directory current does not exist
+     if [ ! -d $node_data_dir/name/current ]; then
+      $node_instance_dir/bin/hdfs namenode -format
+     fi     
+     $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs start namenode
+  done   
 }
-
 start_data_node()
 {
-for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
-do
-   node_instance_dir=$INSTANCES/dataNode$i
-   $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs start datanode
-done   
+  for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
+  do
+     node_instance_dir=$INSTANCES/dataNode$i
+     $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs start datanode
+  done   
 }
 start_resourcemanager()
 {
-for (( i=1; i<=$NUMBER_OF_RESOURCEMANAGER; i++ ))
-do
-   node_instance_dir=$INSTANCES/resourceManager$i
-   $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop start resourcemanager
-done   
+  for (( i=1; i<=$NUMBER_OF_RESOURCEMANAGER; i++ ))
+  do
+     node_instance_dir=$INSTANCES/resourceManager$i
+     $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop start resourcemanager
+  done   
 }
-
 start_nodemanager()
 {
-for (( i=1; i<=$NUMBER_OF_NODEMANAGER; i++ ))
-do
-   node_instance_dir=$INSTANCES/nodeManager$i
-   $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop start nodemanager
-done   
+  for (( i=1; i<=$NUMBER_OF_NODEMANAGER; i++ ))
+  do
+     node_instance_dir=$INSTANCES/nodeManager$i
+     $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop start nodemanager
+  done   
 }
-
-
 stop_()
 {
-stop_data_node
-stop_name_node
-stop_nodemanager
-stop_resourcemanager
-
+  stop_data_node
+  stop_name_node
+  stop_nodemanager
+  stop_resourcemanager
 }
-
 stop_name_node()
 {
-for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
-do
-   node_instance_dir=$INSTANCES/nameNode$i   
-   $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs stop namenode
-done 
+  for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
+  do
+     node_instance_dir=$INSTANCES/nameNode$i   
+     $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs stop namenode
+  done 
 }
 stop_data_node()
 {
-for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
-do
-   node_instance_dir=$INSTANCES/dataNode$i 
-   $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs stop datanode
-done 
+  for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
+  do
+     node_instance_dir=$INSTANCES/dataNode$i 
+     $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs stop datanode
+  done 
 }
 stop_resourcemanager()
 {
-for (( i=1; i<=$NUMBER_OF_RESOURCEMANAGER; i++ ))
-do
-   node_instance_dir=$INSTANCES/resourceManager$i
-   $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop stop resourcemanager
-done   
+  for (( i=1; i<=$NUMBER_OF_RESOURCEMANAGER; i++ ))
+  do
+     node_instance_dir=$INSTANCES/resourceManager$i
+     $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop stop resourcemanager
+  done   
 }
-
 stop_nodemanager()
 {
-for (( i=1; i<=$NUMBER_OF_NODEMANAGER; i++ ))
-do
-   node_instance_dir=$INSTANCES/nodeManager$i
-   $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop stop nodemanager
-done   
+  for (( i=1; i<=$NUMBER_OF_NODEMANAGER; i++ ))
+  do
+     node_instance_dir=$INSTANCES/nodeManager$i
+     $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop stop nodemanager
+  done   
 }
-
 restart_()
 {
-    for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
-    do
-        $INSTANCES/zookeeper$i/bin/zkServer.sh restart
-    done
+  stop_
+  start_    
 }
-
 status_()
 {
-    jps
+  jps
 }
-
 case $1 in
-install)
-    install_
-    ;;
-reinstall)
-    stop_
-    install_
-    start_
-    sleep 2
-    status_
-    ;;
-start)
-    start_
-    ;;
-stop)
-    stop_
-    ;;
-restart)
-    restart_
-    ;;
-status)
-    status_
-    ;;
-printports)
-    printports_
-    ;;
-*)
-    echo "Usage: $0 {install|start|stop|restart|status|printports}" >&2
+  install)
+      install_
+      ;;
+  reinstall)
+      stop_
+      install_
+      start_
+      sleep 2
+      status_
+      ;;
+  start)
+      start_
+      ;;
+  stop)
+      stop_
+      ;;
+  restart)
+      restart_
+      ;;
+  status)
+      status_
+      ;;
+  printports)
+      printports_
+      ;;
+  *)
+  echo "Usage: $0 {install|start|stop|restart|status|printports}" >&2
 esac
-
-
-
-
-
