@@ -1,0 +1,12 @@
+nn/hadoop.com nn
+sn/hadoop.com sn
+dn/hadoop.com dn
+rm/hadoop.com rm
+nm/hadoop.com nm
+jhs/hadoop.com jhs
+zookeeper/hadoop.com zookeeper
+zookeeper2/hadoop.com zookeeper2
+zookeeper3/hadoop.com zookeeper3
+zkcli/hadoop.com zkcli
+zkcli2/hadoop.com zkcli3
+zkcli3/hadoop.com zkcli3
