@@ -1,6 +1,17 @@
-INSTALLATION_BASE_DIR=/home/sage/hadoop
-INSTALLATION_CONF_DIR=/home/sage/hadoop/conf
-HADOOP_RELEASE=/home/sage/hadoop-2.7.0.tar.gz
+basedir=`dirname $0`
+if [ "${basedir}" = "." ]
+then
+    basedir=`pwd`
+elif [ "${basedir}" = ".." ]
+then
+    basedir=`(cd .. ;pwd)`
+fi
+#Modify this if want take custome location as base directory
+BASE_DIR=$basedir
+
+INSTALLATION_BASE_DIR=$BASE_DIR/hadoop
+RESOURCE_DIR=$BASE_DIR/resources
+HADOOP_RELEASE=$BASE_DIR/hadoop-3.0.0-SNAPSHOT.tar.gz
 NUMBER_OF_NAMENODE=2
 NUMBER_OF_DATANODE=3
 NUMBER_OF_JOURNALNODE=3
@@ -11,14 +22,14 @@ REPLICATION=3
 #Name node ports
 NAMENODE_HTTP_ADDRESS_BASE=50070
 NAMENODE_IPC_ADDRESS_BASE=9000
-NAMENODE_JMX_PORT_BASE=8004
+NAMENODE_JMX_PORT_BASE=5500
 NAMENODE_DEBUG_PORT_BASE=4400
 
 #Data node ports
 DATANODE_HTTP_ADDRESS_BASE=50075
 DATANODE_ADDRESS_BASE=50010
 DATANODE_IPC_ADDRESS_BASE=50020
-DATANODE_JMX_PORT_BASE=8010
+DATANODE_JMX_PORT_BASE=5510
 DATANODE_DEBUG_PORT_BASE=4410
 
 #Resource Manager ports
@@ -27,13 +38,15 @@ RESOURCEMANAGER_SCHEDULER_ADDRESS_BASE=8030
 RESOURCEMANAGER_RESOURCE_TRACKER_ADDRESS_BASE=8040
 RESOURCEMANAGER_ADMIN_ADDRESS_BASE=8035
 RESOURCEMANAGER_WEBAPP_ADDRESS_BASE=8088
-RESOURCEMANAGER_JMX_PORT_BASE=8090
+RESOURCEMANAGER_JMX_PORT_BASE=5520
+RESOURCEMANAGER_DEBUG_PORT_BASE=4430
 
 #Node Manager ports
 NODEMANAGER_ADDRESS_BASE=9032
 NODEMANAGER_LOCALIZER_ADDRESS_BASE=9040
 NODEMANAGER_WEBAPP_ADDRESS_BASE=9052
-NODEMANAGER_JMX_PORT_BASE=8095
+NODEMANAGER_JMX_PORT_BASE=5530
+NODEMANAGER_DEBUG_PORT_BASE=5540
 
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
@@ -41,8 +54,11 @@ INSTANCES=$INSTALLATION_BASE_DIR/instances
 install_()
 {
   #Prepare installation directory structure
-  stop_
-  rm -r $INSTALLATION_BASE_DIR
+  
+  if [ -d $INSTALLATION_BASE_DIR ]; then
+	stop_
+	rm -r $INSTALLATION_BASE_DIR
+  fi
   mkdir $INSTALLATION_BASE_DIR
   mkdir $DATAS
   mkdir $INSTANCES    
@@ -56,6 +72,28 @@ extract_hadoop()
   extractModule "resourceManager" $NUMBER_OF_RESOURCEMANAGER
   extractModule "nodeManager" $NUMBER_OF_NODEMANAGER    
 }
+configure_hadoop()
+{
+  configure_namenode
+  configure_datanode
+  configure_resourcemanager
+  configure_nodemanager
+}
+start_()
+{
+  start_name_node
+  start_data_node
+  start_resourcemanager
+  start_nodemanager
+}
+stop_()
+{
+  stop_data_node
+  stop_name_node
+  stop_nodemanager
+  stop_resourcemanager
+}
+
 extractModule()
 {
   module=$1
@@ -91,15 +129,6 @@ addProperty()
 {
   echo "export $2=$3" >> $1  
 }
-
-configure_hadoop()
-{
-  configure_namenode
-  configure_datanode
-  configure_resourcemanager
-  configure_nodemanager
-}
-
 configure_namenode()
 {
 println "Configure name node"
@@ -139,6 +168,10 @@ do
     jmx_port=$(($NAMENODE_JMX_PORT_BASE + $i - 1))
     jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $HADOOP_NAMENODE_OPTS"
     addProperty $hadoop_env "HADOOP_NAMENODE_OPTS" "\"$jmx_prop\""
+	
+	debug_port=$(($NAMENODE_DEBUG_PORT_BASE + $i - 1))
+    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port $HADOOP_NAMENODE_OPTS"
+	addProperty $hadoop_env "HADOOP_NAMENODE_OPTS" "\"$debug_prop\""
 done
 }
 
@@ -184,9 +217,12 @@ do
     jmx_port=$(($DATANODE_JMX_PORT_BASE + $i - 1))
     jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $HADOOP_DATANODE_OPTS"
     addProperty $hadoop_env "HADOOP_DATANODE_OPTS" "\"$jmx_prop\""
+	
+	debug_port=$(($DATANODE_DEBUG_PORT_BASE + $i - 1))
+    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port $HADOOP_DATANODE_OPTS"
+	addProperty $hadoop_env "HADOOP_DATANODE_OPTS" "\"$debug_prop\""
 done
 }
-
 configure_resourcemanager()
 {
 println "Configure resource manager"
@@ -229,6 +265,10 @@ do
     jmx_port=$(($RESOURCEMANAGER_JMX_PORT_BASE + $i - 1))
     jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $YARN_OPTS"
     addProperty $yarn_env "YARN_OPTS" "\"$jmx_prop\""
+	
+	debug_port=$(($RESOURCEMANAGER_DEBUG_PORT_BASE + $i - 1))
+    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port $YARN_OPTS"
+	addProperty $yarn_env "YARN_OPTS" "\"$debug_prop\""
 done
 }
 configure_nodemanager()
@@ -267,6 +307,10 @@ do
     jmx_port=$(($NODEMANAGER_JMX_PORT_BASE + $i - 1))
     jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $YARN_OPTS"
     addProperty $yarn_env "YARN_OPTS" "\"$jmx_prop\""
+	
+	debug_port=$(($NODEMANAGER_DEBUG_PORT_BASE + $i - 1))
+    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port $YARN_OPTS"
+	addProperty $yarn_env "YARN_OPTS" "\"$debug_prop\""
 done
 }
 
@@ -294,13 +338,7 @@ for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
         println
     done
 }
-start_()
-{
-  start_name_node
-  start_data_node
-  start_resourcemanager
-  start_nodemanager
-}
+
 start_name_node()
 {
   for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
@@ -311,7 +349,7 @@ start_name_node()
      if [ ! -d $node_data_dir/name/current ]; then
       $node_instance_dir/bin/hdfs namenode -format
      fi     
-     $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs start namenode
+     $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon start namenode
   done   
 }
 start_data_node()
@@ -319,7 +357,7 @@ start_data_node()
   for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
   do
      node_instance_dir=$INSTANCES/dataNode$i
-     $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs start datanode
+     $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon start datanode
   done   
 }
 start_resourcemanager()
@@ -327,7 +365,7 @@ start_resourcemanager()
   for (( i=1; i<=$NUMBER_OF_RESOURCEMANAGER; i++ ))
   do
      node_instance_dir=$INSTANCES/resourceManager$i
-     $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop start resourcemanager
+     $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon start resourcemanager
   done   
 }
 start_nodemanager()
@@ -335,22 +373,16 @@ start_nodemanager()
   for (( i=1; i<=$NUMBER_OF_NODEMANAGER; i++ ))
   do
      node_instance_dir=$INSTANCES/nodeManager$i
-     $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop start nodemanager
+     $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon start nodemanager
   done   
 }
-stop_()
-{
-  stop_data_node
-  stop_name_node
-  stop_nodemanager
-  stop_resourcemanager
-}
+
 stop_name_node()
 {
   for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
   do
      node_instance_dir=$INSTANCES/nameNode$i   
-     $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs stop namenode
+     $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon stop namenode
   done 
 }
 stop_data_node()
@@ -358,7 +390,7 @@ stop_data_node()
   for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
   do
      node_instance_dir=$INSTANCES/dataNode$i 
-     $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs stop datanode
+     $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon stop datanode
   done 
 }
 stop_resourcemanager()
@@ -366,7 +398,7 @@ stop_resourcemanager()
   for (( i=1; i<=$NUMBER_OF_RESOURCEMANAGER; i++ ))
   do
      node_instance_dir=$INSTANCES/resourceManager$i
-     $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop stop resourcemanager
+     $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon stop resourcemanager
   done   
 }
 stop_nodemanager()
@@ -374,7 +406,7 @@ stop_nodemanager()
   for (( i=1; i<=$NUMBER_OF_NODEMANAGER; i++ ))
   do
      node_instance_dir=$INSTANCES/nodeManager$i
-     $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop stop nodemanager
+     $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon stop nodemanager
   done   
 }
 restart_()

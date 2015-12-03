@@ -1,14 +1,24 @@
-INSTALLATION_BASE_DIR=/home/sage/zk
-RESOURCE_DIR=/home/sage/resources
-ZOOKEEPER_RELEASE=/home/sage/zookeeper-3.6.0-SNAPSHOT.tar.gz
+basedir=`dirname $0`
+if [ "${basedir}" = "." ]
+then
+    basedir=`pwd`
+elif [ "${basedir}" = ".." ]
+then
+    basedir=`(cd .. ;pwd)`
+fi
+#Modify this if want take custome location as base directory
+BASE_DIR=$basedir
+INSTALLATION_BASE_DIR=$BASE_DIR/zk
+RESOURCE_DIR=$BASE_DIR/resources
+ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.6.0-SNAPSHOT.tar.gz
 NUMBER_OF_INSTANCES=3
 CLIENT_PORT_BASE=2181
 CLIENT_SECURE_PORT_BASE=3181
 PEER_COM_PORT_BASE=2888
 LEADER_ELEC_PORT_BASE=3888
-ADMIN_SERVER_PORT_BASE=8088
-JMX_PORT_BASE=9088
-DEBUG_PORT_BASE=4444
+ADMIN_SERVER_PORT_BASE=4088
+JMX_PORT_BASE=6610
+DEBUG_PORT_BASE=4455
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 AUTHENTION=true
@@ -18,14 +28,12 @@ SECURE=true
 install_()
 {
     # Prepare installation directory structure
-    rm -r $INSTALLATION_BASE_DIR
+	if [ -d $INSTALLATION_BASE_DIR ]; then
+		rm -r $INSTALLATION_BASE_DIR
+	fi	
     mkdir $INSTALLATION_BASE_DIR
-
-
-
     mkdir $DATAS
     mkdir $INSTANCES
-
 
     # Extract release
     println "Creating installation folder structure"
@@ -37,6 +45,14 @@ install_()
         
         zoo_data_dir=$DATAS/data$i
         mkdir $zoo_data_dir
+		#copy logging jars
+		if [ ! -f $zoo_instance_dir/lib/log4j-1.2.16.jar ]; then 
+			cp $RESOURCE_DIR/zookeeper/lib/log4j-1.2.16.jar $zoo_instance_dir/lib/
+		fi
+		
+		if [ ! -f $zoo_instance_dir/lib/slf4j-api-1.7.5.jar ]; then 
+			cp $RESOURCE_DIR/zookeeper/lib/slf4j-api-1.7.5.jar $zoo_instance_dir/lib/
+		fi
     done
 
     # Create dynamic configuration
@@ -137,8 +153,13 @@ install_()
         server_file=$zoo_instance_dir/bin/zkServer.sh
         debug_port=$(($DEBUG_PORT_BASE + $i - 1))
         debug_options="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
-        sed -i "s|nohup \"\$JAVA\" \$ZOO_DATADIR_AUTOCREATE|nohup \"\$JAVA\" \$ZOO_DATADIR_AUTOCREATE $debug_options|" $server_file    
+        sed -i "s|nohup \"\$JAVA\" \$ZOO_DATADIR_AUTOCREATE|nohup \"\$JAVA\" \$ZOO_DATADIR_AUTOCREATE $debug_options|" $server_file
+		
     done
+	
+	# Do cleanup
+	rm $dynamic_config_file
+
 }
 println()
 {
@@ -169,8 +190,10 @@ for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
 runCommand()
 {
 for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
-do
-  $INSTANCES/zookeeper$i/bin/zkServer.sh $1
+do	
+  pushd $INSTANCES/zookeeper$i/bin/
+  ./zkServer.sh $1
+  popd
 done
 
 }
