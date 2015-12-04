@@ -141,7 +141,8 @@ do
     hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
     name_node_rpc_port=$(($NAMENODE_IPC_ADDRESS_BASE + $i - 1))
     
-    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://localhost:$name_node_rpc_port"  
+    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://localhost:$name_node_rpc_port" 
+	addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-bind-host" "0.0.0.0"
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
@@ -260,15 +261,15 @@ do
     #Env configuration
     pidDir=$node_data_dir/pid
     mkdir $pidDir
-    addProperty $yarn_env "YARN_PID_DIR" "$pidDir"
+    addProperty $yarn_env "HADOOP_PID_DIR" "$pidDir"
     
     jmx_port=$(($RESOURCEMANAGER_JMX_PORT_BASE + $i - 1))
-    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $YARN_OPTS"
-    addProperty $yarn_env "YARN_OPTS" "\"$jmx_prop\""
+    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $HADOOP_OPTS"
+    addProperty $yarn_env "HADOOP_OPTS" "\"$jmx_prop\""
 	
 	debug_port=$(($RESOURCEMANAGER_DEBUG_PORT_BASE + $i - 1))
-    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port $YARN_OPTS"
-	addProperty $yarn_env "YARN_OPTS" "\"$debug_prop\""
+    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port $HADOOP_OPTS"
+	addProperty $yarn_env "HADOOP_OPTS" "\"$debug_prop\""
 done
 }
 configure_nodemanager()
@@ -302,15 +303,15 @@ do
     #Env configuration
     pidDir=$node_data_dir/pid
     mkdir $pidDir
-    addProperty $yarn_env "YARN_PID_DIR" "$pidDir"
+    addProperty $yarn_env "HADOOP_PID_DIR" "$pidDir"
     
     jmx_port=$(($NODEMANAGER_JMX_PORT_BASE + $i - 1))
-    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $YARN_OPTS"
-    addProperty $yarn_env "YARN_OPTS" "\"$jmx_prop\""
+    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $HADOOP_OPTS"
+    addProperty $yarn_env "HADOOP_OPTS" "\"$jmx_prop\""
 	
 	debug_port=$(($NODEMANAGER_DEBUG_PORT_BASE + $i - 1))
-    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port $YARN_OPTS"
-	addProperty $yarn_env "YARN_OPTS" "\"$debug_prop\""
+    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port $HADOOP_OPTS"
+	addProperty $yarn_env "HADOOP_OPTS" "\"$debug_prop\""
 done
 }
 
@@ -321,22 +322,49 @@ println()
 }
 printports_()
 {
-for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
-    do
-        server_id=$i
-        peer_port=$(($PEER_COM_PORT_BASE + $i - 1))
-        leader_elec_port=$(($LEADER_ELEC_PORT_BASE + $i - 1))
-        client_port=$(($CLIENT_PORT_BASE + $i - 1))
-        secure_client_port=$(($CLIENT_SECURE_PORT_BASE + $i - 1))
-        admin_port=$(($ADMIN_SERVER_PORT_BASE + $i - 1))
-        jmx_port=$(($JMX_PORT_BASE + $i - 1))
-        echo server.$server_id=localhost:$peer_port:$leader_elec_port:participant;
-        echo "clientPort="$client_port
-        echo "secureClientPort="$secure_client_port
-        echo "admin.serverPort="$admin_port
-        echo "jmx_port="$jmx_port
-        println
-    done
+for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
+do
+	ipc_port=$(($NAMENODE_IPC_ADDRESS_BASE + $i - 1))
+	web_port=$(($NAMENODE_HTTP_ADDRESS_BASE + $i - 1))
+	jmx_port=$(($NAMENODE_JMX_PORT_BASE + $i - 1))
+	debug_port=$(($NAMENODE_DEBUG_PORT_BASE + $i - 1))
+	instanceName="NameNode"$i		
+	echo "$instanceName=ipc_port:$ipc_port,web_port:$web_port,jmx_port:$jmx_port,debug_port:$debug_port"
+done
+
+for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
+do
+	ipc_port=$(($DATANODE_IPC_ADDRESS_BASE + $i - 1))
+	web_port=$(($DATANODE_HTTP_ADDRESS_BASE + $i - 1))
+	datanode_port=$(($DATANODE_ADDRESS_BASE + $i - 1))
+	jmx_port=$(($DATANODE_JMX_PORT_BASE + $i - 1))
+	debug_port=$(($DATANODE_DEBUG_PORT_BASE + $i - 1))
+	instanceName="DataNode"$i	
+	echo "$instanceName=ipc_port:$ipc_port,web_port:$web_port,datanode_port:$datanode_port,jmx_port:$jmx_port,debug_port:$debug_port"
+done
+for (( i=1; i<=$NUMBER_OF_RESOURCEMANAGER; i++ ))
+do
+	resourcemanager_port=$(($RESOURCEMANAGER_ADDRESS_BASE + $i - 1))
+	resourcemanager_scheduler_port=$(($RESOURCEMANAGER_SCHEDULER_ADDRESS_BASE + $i - 1))
+	resource_tracker_port=$(($RESOURCEMANAGER_RESOURCE_TRACKER_ADDRESS_BASE + $i - 1))
+	admin_port=$(($RESOURCEMANAGER_ADMIN_ADDRESS_BASE + $i - 1))
+	web_port=$(($RESOURCEMANAGER_WEBAPP_ADDRESS_BASE + $i - 1))	
+	jmx_port=$(($RESOURCEMANAGER_JMX_PORT_BASE + $i - 1))
+	debug_port=$(($RESOURCEMANAGER_DEBUG_PORT_BASE + $i - 1))
+	instanceName="ResourceManager"$i	
+	echo "$instanceName=resourcemanager_port:$resourcemanager_port,resourcemanager_scheduler_port:$resourcemanager_scheduler_port,resource_tracker_port:$resource_tracker_port,admin_port:$admin_port,web_port:$web_port,jmx_port:$jmx_port,debug_port:$debug_port"
+done
+for (( i=1; i<=$NUMBER_OF_NODEMANAGER; i++ ))
+do
+	nodemanager_port=$(($NODEMANAGER_ADDRESS_BASE + $i - 1))
+	locallizer_port=$(($NODEMANAGER_LOCALIZER_ADDRESS_BASE + $i - 1))
+	web_port=$(($NODEMANAGER_WEBAPP_ADDRESS_BASE + $i - 1))	
+	jmx_port=$(($NODEMANAGER_JMX_PORT_BASE + $i - 1))
+	debug_port=$(($NODEMANAGER_DEBUG_PORT_BASE + $i - 1))
+	instanceName="NodeManager"$i
+	echo "$instanceName=nodemanager_port:$nodemanager_port,locallizer_port:$locallizer_port,web_port:$web_port,jmx_port:$jmx_port,debug_port:$debug_port"
+done
+
 }
 
 start_name_node()
