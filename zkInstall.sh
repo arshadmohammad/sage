@@ -48,11 +48,14 @@ install_()
 		#copy logging jars
 		if [ ! -f $zoo_instance_dir/lib/log4j-1.2.16.jar ]; then 
 			cp $RESOURCE_DIR/zookeeper/lib/log4j-1.2.16.jar $zoo_instance_dir/lib/
-		fi
-		
+		fi		
 		if [ ! -f $zoo_instance_dir/lib/slf4j-api-1.7.5.jar ]; then 
 			cp $RESOURCE_DIR/zookeeper/lib/slf4j-api-1.7.5.jar $zoo_instance_dir/lib/
 		fi
+		if [ ! -f $zoo_instance_dir/lib/slf4j-log4j12-1.7.5.jar ]; then 
+			cp $RESOURCE_DIR/zookeeper/lib/slf4j-log4j12-1.7.5.jar $zoo_instance_dir/lib/
+		fi
+		
     done
 
     # Create dynamic configuration
@@ -85,13 +88,13 @@ install_()
     do
       zoo_instance_dir=$INSTANCES/zookeeper$i 
       cp  $dynamic_config_file $zoo_instance_dir/conf/
-      if [ $AUTHENTION ]; then
+      if [ $AUTHENTION = 'true' ]; then
         cp  $RESOURCE_DIR/common/hadoop.keytab $zoo_instance_dir/conf/
         cp  $RESOURCE_DIR/zookeeper/jaas.conf $zoo_instance_dir/conf/
         cp  $RESOURCE_DIR/common/krb5.conf $zoo_instance_dir/conf/
         sed -i "s|keyTab=.*|keyTab=\"$zoo_instance_dir/conf/hadoop.keytab\"|" $zoo_instance_dir/conf/jaas.conf
       fi      
-      if [ $SECURE ]; then
+      if [ $SECURE = 'true' ]; then
         cp  $RESOURCE_DIR/common/keystore $zoo_instance_dir/conf/
       fi      
     done
@@ -110,7 +113,7 @@ install_()
         client_port=$(($CLIENT_PORT_BASE + $i - 1))
         sed -i "s/clientPort=.*/clientPort=$client_port/" $zoo_cfg_file    
         
-        if [ $SECURE ]; then
+        if [ $SECURE = 'true' ]; then
           secure_client_port=$(($CLIENT_SECURE_PORT_BASE + $i - 1))
           echo "secureClientPort=$secure_client_port" >> $zoo_cfg_file          
           #ssl configurations
@@ -128,7 +131,7 @@ install_()
         echo "dynamicConfigFile=$dynamic_file_location" >> $zoo_cfg_file        
         
         #static configurations
-        if [ $SECURE ]; then
+        if [ $SECURE = 'true' ]; then
           echo "serverCnxnFactory=org.apache.zookeeper.server.NettyServerCnxnFactory" >> $zoo_cfg_file
           echo "clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty" >> $zoo_cfg_file
         else
@@ -138,8 +141,10 @@ install_()
         
         env_file=$zoo_instance_dir/bin/zkEnv.sh
         sed -i "s/ZOO_LOG4J_PROP=.*/ZOO_LOG4J_PROP=\"INFO,ROLLINGFILE\"/" $env_file
+		log4j_file=$zoo_instance_dir/conf/log4j.properties
+		sed -i "s|INFO|INFO|" $log4j_file
         
-        if [ $AUTHENTION ]; then
+        if [ $AUTHENTION = 'true' ]; then
           jaas_location=$zoo_instance_dir/conf/jaas.conf
           krb5_location=$zoo_instance_dir/conf/krb5.conf
           echo "export SERVER_JVMFLAGS=\"\$SERVER_JVMFLAGS -Djava.security.auth.login.config=$jaas_location -Djava.security.krb5.conf=$krb5_location -Dsun.security.krb5.debug=true\"" >> $env_file
