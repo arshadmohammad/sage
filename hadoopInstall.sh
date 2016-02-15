@@ -11,7 +11,7 @@ BASE_DIR=$basedir
 
 INSTALLATION_BASE_DIR=$BASE_DIR/hadoop
 RESOURCE_DIR=$BASE_DIR/resources
-HADOOP_RELEASE=$BASE_DIR/hadoop-3.0.0-SNAPSHOT.tar.gz
+HADOOP_RELEASE=$BASE_DIR/hadoop-2.7.2.tar.gz
 NUMBER_OF_NAMENODE=2
 NUMBER_OF_DATANODE=3
 NUMBER_OF_JOURNALNODE=3
@@ -50,6 +50,9 @@ NODEMANAGER_DEBUG_PORT_BASE=5540
 
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
+THIS_MACHINE_IP=192.168.1.3
+# is the release from hadoop branch-2
+HADOOP2=true
 
 install_()
 {
@@ -81,17 +84,17 @@ configure_hadoop()
 }
 start_()
 {
-  start_name_node
-  start_data_node
-  start_resourcemanager
-  start_nodemanager
+  start_stop_namenode start
+  start_stop_datanode start
+  start_stop_resourcemanager start
+  start_stop_nodemanager start
 }
 stop_()
 {
-  stop_data_node
-  stop_name_node
-  stop_nodemanager
-  stop_resourcemanager
+  start_stop_datanode stop
+  start_stop_namenode stop  
+  start_stop_resourcemanager stop
+  start_stop_nodemanager stop
 }
 
 extractModule()
@@ -141,8 +144,8 @@ do
     hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
     name_node_rpc_port=$(($NAMENODE_IPC_ADDRESS_BASE + $i - 1))
     
-    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://localhost:$name_node_rpc_port" 
-	addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-bind-host" "0.0.0.0"
+    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://$THIS_MACHINE_IP:$name_node_rpc_port" 
+    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-bind-host" "0.0.0.0"
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
@@ -167,12 +170,12 @@ do
     addProperty $hadoop_env "HADOOP_PID_DIR" "$pidDir"
     
     jmx_port=$(($NAMENODE_JMX_PORT_BASE + $i - 1))
-    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $HADOOP_NAMENODE_OPTS"
+    jmx_prop="$HADOOP_NAMENODE_OPTS -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
     addProperty $hadoop_env "HADOOP_NAMENODE_OPTS" "\"$jmx_prop\""
 	
-	debug_port=$(($NAMENODE_DEBUG_PORT_BASE + $i - 1))
-    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port $HADOOP_NAMENODE_OPTS"
-	addProperty $hadoop_env "HADOOP_NAMENODE_OPTS" "\"$debug_prop\""
+    debug_port=$(($NAMENODE_DEBUG_PORT_BASE + $i - 1))
+    debug_prop="$HADOOP_NAMENODE_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port "
+    addProperty $hadoop_env "HADOOP_NAMENODE_OPTS" "\"$debug_prop\""
 done
 }
 
@@ -187,7 +190,7 @@ do
     hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
     hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
     
-    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://localhost:$NAMENODE_IPC_ADDRESS_BASE"  
+    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://$THIS_MACHINE_IP:$NAMENODE_IPC_ADDRESS_BASE"  
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
@@ -216,12 +219,12 @@ do
     addProperty $hadoop_env "HADOOP_PID_DIR" "$pidDir"
     
     jmx_port=$(($DATANODE_JMX_PORT_BASE + $i - 1))
-    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $HADOOP_DATANODE_OPTS"
+    jmx_prop="$HADOOP_DATANODE_OPTS -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
     addProperty $hadoop_env "HADOOP_DATANODE_OPTS" "\"$jmx_prop\""
 	
-	debug_port=$(($DATANODE_DEBUG_PORT_BASE + $i - 1))
-    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port $HADOOP_DATANODE_OPTS"
-	addProperty $hadoop_env "HADOOP_DATANODE_OPTS" "\"$debug_prop\""
+    debug_port=$(($DATANODE_DEBUG_PORT_BASE + $i - 1))
+    debug_prop="$HADOOP_DATANODE_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
+    addProperty $hadoop_env "HADOOP_DATANODE_OPTS" "\"$debug_prop\""
 done
 }
 configure_resourcemanager()
@@ -235,7 +238,7 @@ do
     yarn_site_xml=$node_instance_dir/etc/hadoop/yarn-site.xml    
     yarn_env=$node_instance_dir/etc/hadoop/yarn-env.sh
     
-    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://localhost:$NAMENODE_IPC_ADDRESS_BASE"  
+    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://$THIS_MACHINE_IP:$NAMENODE_IPC_ADDRESS_BASE"  
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
@@ -247,7 +250,7 @@ do
     addXMLProperty $yarn_site_xml "yarn.resourcemanager.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_port"
     
     resourcemanager_scheduler_port=$(($RESOURCEMANAGER_SCHEDULER_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.scheduler.address" "localhost:$resourcemanager_scheduler_port"
+    addXMLProperty $yarn_site_xml "yarn.resourcemanager.scheduler.address" "$THIS_MACHINE_IP:$resourcemanager_scheduler_port"
     
     resourcemanager_resource_tracker_port=$(($RESOURCEMANAGER_RESOURCE_TRACKER_ADDRESS_BASE + $i - 1))
     addXMLProperty $yarn_site_xml "yarn.resourcemanager.resource-tracker.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_resource_tracker_port"
@@ -258,18 +261,22 @@ do
     resourcemanager_webapp_address_port=$(($RESOURCEMANAGER_WEBAPP_ADDRESS_BASE + $i - 1))
     addXMLProperty $yarn_site_xml "yarn.resourcemanager.webapp.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_webapp_address_port"
     
+    VAR_PREFIX="HADOOP"
+    if [ $HADOOP2 = 'true' ]; then
+	    VAR_PREFIX="YARN"
+	  fi
     #Env configuration
     pidDir=$node_data_dir/pid
     mkdir $pidDir
-    addProperty $yarn_env "HADOOP_PID_DIR" "$pidDir"
+    addProperty $yarn_env $VAR_PREFIX"_PID_DIR" "$pidDir"
     
     jmx_port=$(($RESOURCEMANAGER_JMX_PORT_BASE + $i - 1))
-    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $HADOOP_OPTS"
-    addProperty $yarn_env "HADOOP_OPTS" "\"$jmx_prop\""
+    jmx_prop="\$${VAR_PREFIX}_OPTS -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+    addProperty $yarn_env $VAR_PREFIX"_OPTS" "\"$jmx_prop\""
 	
-	debug_port=$(($RESOURCEMANAGER_DEBUG_PORT_BASE + $i - 1))
-    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port $HADOOP_OPTS"
-	addProperty $yarn_env "HADOOP_OPTS" "\"$debug_prop\""
+    debug_port=$(($RESOURCEMANAGER_DEBUG_PORT_BASE + $i - 1))
+    debug_prop="${VAR_PREFIX}_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
+    addProperty $yarn_env $VAR_PREFIX"_OPTS" "\"$debug_prop\""
 done
 }
 configure_nodemanager()
@@ -283,7 +290,7 @@ do
     yarn_site_xml=$node_instance_dir/etc/hadoop/yarn-site.xml    
     yarn_env=$node_instance_dir/etc/hadoop/yarn-env.sh
     
-    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://localhost:$NAMENODE_IPC_ADDRESS_BASE"  
+    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://$THIS_MACHINE_IP:$NAMENODE_IPC_ADDRESS_BASE"  
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
@@ -300,18 +307,22 @@ do
     nodemanager_webapp_address_port=$(($NODEMANAGER_WEBAPP_ADDRESS_BASE + $i - 1))
     addXMLProperty $yarn_site_xml "yarn.nodemanager.webapp.address" "\${yarn.nodemanager.hostname}:$nodemanager_webapp_address_port"    
     
+    VAR_PREFIX="HADOOP"
+    if [ $HADOOP2 = 'true' ]; then
+	    VAR_PREFIX="YARN"
+	  fi
     #Env configuration
     pidDir=$node_data_dir/pid
     mkdir $pidDir
-    addProperty $yarn_env "HADOOP_PID_DIR" "$pidDir"
+    addProperty $yarn_env $VAR_PREFIX"_PID_DIR" "$pidDir"
     
     jmx_port=$(($NODEMANAGER_JMX_PORT_BASE + $i - 1))
-    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false $HADOOP_OPTS"
-    addProperty $yarn_env "HADOOP_OPTS" "\"$jmx_prop\""
+    jmx_prop="${VAR_PREFIX}_OPTS -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+    addProperty $yarn_env $VAR_PREFIX"_OPTS" "\"$jmx_prop\""
 	
-	debug_port=$(($NODEMANAGER_DEBUG_PORT_BASE + $i - 1))
-    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port $HADOOP_OPTS"
-	addProperty $yarn_env "HADOOP_OPTS" "\"$debug_prop\""
+    debug_port=$(($NODEMANAGER_DEBUG_PORT_BASE + $i - 1))
+    debug_prop="${VAR_PREFIX}_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
+    addProperty $yarn_env "${VAR_PREFIX}_OPTS" "\"$debug_prop\""
 done
 }
 
@@ -364,77 +375,65 @@ do
 	instanceName="NodeManager"$i
 	echo "$instanceName=nodemanager_port:$nodemanager_port,locallizer_port:$locallizer_port,web_port:$web_port,jmx_port:$jmx_port,debug_port:$debug_port"
 done
-
 }
 
-start_name_node()
+start_stop_namenode()
 {
+  action=$1
   for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
   do
      node_instance_dir=$INSTANCES/nameNode$i
-     node_data_dir=$DATAS/nameNodeData$i
-     #Formate name node only when directory current does not exist
-     if [ ! -d $node_data_dir/name/current ]; then
-      $node_instance_dir/bin/hdfs namenode -format
-     fi     
-     $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon start namenode
-  done   
+     if [ $action = 'start' ]; then
+        node_data_dir=$DATAS/nameNodeData$i
+        #Formate name node only when directory current does not exist
+        if [ ! -d $node_data_dir/name/current ]; then
+          $node_instance_dir/bin/hdfs namenode -format
+        fi
+     fi
+     if [ $HADOOP2 = 'true' ]; then
+        $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs $action namenode
+     else
+        $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon $action namenode
+     fi
+  done 
 }
-start_data_node()
+start_stop_datanode()
 {
+  action=$1
   for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
   do
      node_instance_dir=$INSTANCES/dataNode$i
-     $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon start datanode
-  done   
+     if [ $HADOOP2 = 'true' ]; then
+        $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs $action datanode
+     else
+        $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon $action datanode
+     fi
+  done 
 }
-start_resourcemanager()
+start_stop_resourcemanager()
 {
+  action=$1
   for (( i=1; i<=$NUMBER_OF_RESOURCEMANAGER; i++ ))
   do
      node_instance_dir=$INSTANCES/resourceManager$i
-     $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon start resourcemanager
+     if [ $HADOOP2 = 'true' ]; then
+        $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop $action resourcemanager
+     else
+        $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon $action resourcemanager
+     fi
   done   
 }
-start_nodemanager()
+start_stop_nodemanager()
 {
+  action=$1
   for (( i=1; i<=$NUMBER_OF_NODEMANAGER; i++ ))
   do
      node_instance_dir=$INSTANCES/nodeManager$i
-     $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon start nodemanager
-  done   
-}
-
-stop_name_node()
-{
-  for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
-  do
-     node_instance_dir=$INSTANCES/nameNode$i   
-     $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon stop namenode
-  done 
-}
-stop_data_node()
-{
-  for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
-  do
-     node_instance_dir=$INSTANCES/dataNode$i 
-     $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon stop datanode
-  done 
-}
-stop_resourcemanager()
-{
-  for (( i=1; i<=$NUMBER_OF_RESOURCEMANAGER; i++ ))
-  do
-     node_instance_dir=$INSTANCES/resourceManager$i
-     $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon stop resourcemanager
-  done   
-}
-stop_nodemanager()
-{
-  for (( i=1; i<=$NUMBER_OF_NODEMANAGER; i++ ))
-  do
-     node_instance_dir=$INSTANCES/nodeManager$i
-     $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon stop nodemanager
+     if [ $HADOOP2 = 'true' ]; then
+        $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop $action nodemanager
+     else
+        $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon $action nodemanager
+     fi 
   done   
 }
 restart_()
@@ -451,7 +450,6 @@ case $1 in
       install_
       ;;
   reinstall)
-      stop_
       install_
       start_
       sleep 2
