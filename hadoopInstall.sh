@@ -12,10 +12,9 @@ BASE_DIR=$basedir
 INSTALLATION_BASE_DIR=$BASE_DIR/hadoop
 RESOURCE_DIR=$BASE_DIR/resources
 HADOOP_RELEASE=$BASE_DIR/hadoop-2.7.2.tar.gz
-NUMBER_OF_NAMENODE=2
+NUMBER_OF_NAMENODE=1
 NUMBER_OF_DATANODE=3
-NUMBER_OF_JOURNALNODE=3
-NUMBER_OF_RESOURCEMANAGER=2
+NUMBER_OF_RESOURCEMANAGER=1
 NUMBER_OF_NODEMANAGER=3
 
 REPLICATION=3
@@ -261,22 +260,18 @@ do
     resourcemanager_webapp_address_port=$(($RESOURCEMANAGER_WEBAPP_ADDRESS_BASE + $i - 1))
     addXMLProperty $yarn_site_xml "yarn.resourcemanager.webapp.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_webapp_address_port"
     
-    VAR_PREFIX="HADOOP"
-    if [ $HADOOP2 = 'true' ]; then
-	    VAR_PREFIX="YARN"
-	  fi
     #Env configuration
     pidDir=$node_data_dir/pid
     mkdir $pidDir
     addProperty $yarn_env $VAR_PREFIX"_PID_DIR" "$pidDir"
     
     jmx_port=$(($RESOURCEMANAGER_JMX_PORT_BASE + $i - 1))
-    jmx_prop="\$${VAR_PREFIX}_OPTS -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
-    addProperty $yarn_env $VAR_PREFIX"_OPTS" "\"$jmx_prop\""
+    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+    addProperty $yarn_env "YARN_RESOURCEMANAGER_OPTS" "\"$jmx_prop\""
 	
     debug_port=$(($RESOURCEMANAGER_DEBUG_PORT_BASE + $i - 1))
-    debug_prop="${VAR_PREFIX}_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
-    addProperty $yarn_env $VAR_PREFIX"_OPTS" "\"$debug_prop\""
+    debug_prop="\$YARN_RESOURCEMANAGER_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
+    addProperty $yarn_env "YARN_RESOURCEMANAGER_OPTS" "\"$debug_prop\""
 done
 }
 configure_nodemanager()
@@ -317,12 +312,12 @@ do
     addProperty $yarn_env $VAR_PREFIX"_PID_DIR" "$pidDir"
     
     jmx_port=$(($NODEMANAGER_JMX_PORT_BASE + $i - 1))
-    jmx_prop="${VAR_PREFIX}_OPTS -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
-    addProperty $yarn_env $VAR_PREFIX"_OPTS" "\"$jmx_prop\""
+    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+    addProperty $yarn_env "YARN_NODEMANAGER_OPTS" "\"$jmx_prop\""
 	
     debug_port=$(($NODEMANAGER_DEBUG_PORT_BASE + $i - 1))
-    debug_prop="${VAR_PREFIX}_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
-    addProperty $yarn_env "${VAR_PREFIX}_OPTS" "\"$debug_prop\""
+    debug_prop="\$YARN_NODEMANAGER_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
+    addProperty $yarn_env "YARN_NODEMANAGER_OPTS" "\"$debug_prop\""
 done
 }
 
