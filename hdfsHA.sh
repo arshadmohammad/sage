@@ -12,10 +12,9 @@ BASE_DIR=$basedir
 INSTALLATION_BASE_DIR=$BASE_DIR/hadoop
 RESOURCE_DIR=$BASE_DIR/resources
 HADOOP_RELEASE=$BASE_DIR/hadoop-2.7.2.tar.gz
-NUMBER_OF_NAMENODE=1
+NUMBER_OF_NAMENODE=2
 NUMBER_OF_DATANODE=3
-NUMBER_OF_RESOURCEMANAGER=1
-NUMBER_OF_NODEMANAGER=3
+NUMBER_OF_JOURNALNODE=3
 
 REPLICATION=3
 #Name node ports
@@ -31,21 +30,12 @@ DATANODE_IPC_ADDRESS_BASE=50020
 DATANODE_JMX_PORT_BASE=5510
 DATANODE_DEBUG_PORT_BASE=4410
 
-#Resource Manager ports
-RESOURCEMANAGER_ADDRESS_BASE=8032
-RESOURCEMANAGER_SCHEDULER_ADDRESS_BASE=8030
-RESOURCEMANAGER_RESOURCE_TRACKER_ADDRESS_BASE=8040
-RESOURCEMANAGER_ADMIN_ADDRESS_BASE=8035
-RESOURCEMANAGER_WEBAPP_ADDRESS_BASE=8088
-RESOURCEMANAGER_JMX_PORT_BASE=5520
-RESOURCEMANAGER_DEBUG_PORT_BASE=4430
-
-#Node Manager ports
-NODEMANAGER_ADDRESS_BASE=9032
-NODEMANAGER_LOCALIZER_ADDRESS_BASE=9040
-NODEMANAGER_WEBAPP_ADDRESS_BASE=9052
-NODEMANAGER_JMX_PORT_BASE=5530
-NODEMANAGER_DEBUG_PORT_BASE=4440
+#Journal node ports
+JOURNALNODE_IPC_ADDRESS_BASE=8480
+JOURNALNODE_HTTP_ADDRESS_BASE=8485
+JOURNALNODE_HTTPS_ADDRESS_BASE=8491
+JOURNALNODEJMX_PORT_BASE=5540
+JOURNALNODE_DEBUG_PORT_BASE=4450
 
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
@@ -71,29 +61,25 @@ extract_hadoop()
 {
   extractModule "nameNode" $NUMBER_OF_NAMENODE
   extractModule "dataNode" $NUMBER_OF_DATANODE
-  extractModule "resourceManager" $NUMBER_OF_RESOURCEMANAGER
-  extractModule "nodeManager" $NUMBER_OF_NODEMANAGER    
+  extractModule "journalNode" $NUMBER_OF_JOURNALNODE
 }
 configure_hadoop()
 {
   configure_namenode
   configure_datanode
-  configure_resourcemanager
-  configure_nodemanager
+  configure_journalnode
 }
 start_()
 {
+  start_stop_journalnode start
   start_stop_namenode start
-  start_stop_datanode start
-  start_stop_resourcemanager start
-  start_stop_nodemanager start
+  start_stop_datanode start  
 }
 stop_()
 {
   start_stop_datanode stop
-  start_stop_namenode stop  
-  start_stop_resourcemanager stop
-  start_stop_nodemanager stop
+  start_stop_namenode stop 
+  start_stop_journalnode stop
 }
 
 extractModule()
@@ -134,17 +120,33 @@ addProperty()
 configure_namenode()
 {
 println "Configure name node"
-for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
+for (( i=1; i<=2; i++ ))
 do
     node_instance_dir=$INSTANCES/nameNode$i
     node_data_dir=$DATAS/nameNodeData$i
     core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
     hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
     hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
-    name_node_rpc_port=$(($NAMENODE_IPC_ADDRESS_BASE + $i - 1))
     
-    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://$THIS_MACHINE_IP:$name_node_rpc_port" 
-    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-bind-host" "0.0.0.0"
+    addXMLProperty $hdfs_site_xml "dfs.nameservices" "mycluster"
+    addXMLProperty $hdfs_site_xml "dfs.ha.namenodes.mycluster" "nn1,nn2"
+    addXMLProperty $hdfs_site_xml "dfs.ha.namenode.id" "nn"$i
+    name_node_rpc_port1=$(($NAMENODE_IPC_ADDRESS_BASE ))
+    name_node_rpc_port2=$(($NAMENODE_IPC_ADDRESS_BASE + 1))
+    
+    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://mycluster" 
+    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn1" "$THIS_MACHINE_IP:$name_node_rpc_port1"
+    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn2" "$THIS_MACHINE_IP:$name_node_rpc_port2"
+    
+    http_port1=$(($NAMENODE_HTTP_ADDRESS_BASE))
+    http_port2=$(($NAMENODE_HTTP_ADDRESS_BASE + 1))
+    addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn1" "0.0.0.0:$http_port1"
+    addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn2" "0.0.0.0:$http_port2"
+    
+    addXMLProperty $hdfs_site_xml "dfs.namenode.shared.edits.dir" "qjournal://$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 1));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 2))/mycluster"
+    addXMLProperty $hdfs_site_xml "dfs.client.failover.proxy.provider.mycluster" "org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider"
+    addXMLProperty $hdfs_site_xml "dfs.ha.fencing.methods" "sshfence"
+    addXMLProperty $hdfs_site_xml "dfs.ha.fencing.ssh.private-key-files" "/root/.ssh/id_rsa"
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
@@ -160,8 +162,7 @@ do
     mkdir $editDir
     addXMLProperty $hdfs_site_xml "dfs.namenode.edits.dir" "$editDir"
 
-    http_port=$(($NAMENODE_HTTP_ADDRESS_BASE + $i - 1))
-    addXMLProperty $hdfs_site_xml "dfs.namenode.http-address" "0.0.0.0:$http_port"
+    
     
     #Env configuration
     pidDir=$node_data_dir/pid
@@ -173,7 +174,7 @@ do
     addProperty $hadoop_env "HADOOP_NAMENODE_OPTS" "\"$jmx_prop\""
 	
     debug_port=$(($NAMENODE_DEBUG_PORT_BASE + $i - 1))
-    debug_prop="$HADOOP_NAMENODE_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port "
+    debug_prop="\$HADOOP_NAMENODE_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port "
     addProperty $hadoop_env "HADOOP_NAMENODE_OPTS" "\"$debug_prop\""
 done
 }
@@ -210,8 +211,6 @@ do
     data_node_ipc_port=$(($DATANODE_IPC_ADDRESS_BASE + $i - 1))
     addXMLProperty $hdfs_site_xml "dfs.datanode.ipc.address" "0.0.0.0:$data_node_ipc_port"
     
-    
-    
     #Env configuration
     pidDir=$node_data_dir/pid
     mkdir $pidDir
@@ -226,98 +225,44 @@ do
     addProperty $hadoop_env "HADOOP_DATANODE_OPTS" "\"$debug_prop\""
 done
 }
-configure_resourcemanager()
+configure_journalnode()
 {
-println "Configure resource manager"
-for (( i=1; i<=$NUMBER_OF_RESOURCEMANAGER; i++ ))
+println "Configure journal node"
+for (( i=1; i<=$NUMBER_OF_JOURNALNODE; i++ ))
 do
-    node_instance_dir=$INSTANCES/resourceManager$i
-    node_data_dir=$DATAS/resourceManagerData$i
+    node_instance_dir=$INSTANCES/journalNode$i
+    node_data_dir=$DATAS/journalNodeData$i
     core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
-    yarn_site_xml=$node_instance_dir/etc/hadoop/yarn-site.xml    
-    yarn_env=$node_instance_dir/etc/hadoop/yarn-env.sh
-    
-    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://$THIS_MACHINE_IP:$NAMENODE_IPC_ADDRESS_BASE"  
+    hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
+    hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
-    addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir"
+    addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir"    
     
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.hostname" "0.0.0.0"
+    dataDir=$node_data_dir/data
+    mkdir $dataDir
+    addXMLProperty $hdfs_site_xml "dfs.journalnode.edits.dir" "$dataDir"
     
-    resourcemanager_port=$(($RESOURCEMANAGER_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_port"
-    
-    resourcemanager_scheduler_port=$(($RESOURCEMANAGER_SCHEDULER_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.scheduler.address" "$THIS_MACHINE_IP:$resourcemanager_scheduler_port"
-    
-    resourcemanager_resource_tracker_port=$(($RESOURCEMANAGER_RESOURCE_TRACKER_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.resource-tracker.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_resource_tracker_port"
-    
-    resourcemanager_admin_address_port=$(($RESOURCEMANAGER_ADMIN_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.admin.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_admin_address_port"
-    
-    resourcemanager_webapp_address_port=$(($RESOURCEMANAGER_WEBAPP_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.webapp.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_webapp_address_port"
+    journal_node_ipc_port=$(($JOURNALNODE_IPC_ADDRESS_BASE + $i - 1))
+    addXMLProperty $hdfs_site_xml "dfs.journalnode.rpc-address" "0.0.0.0:$journal_node_ipc_port"
+
+    http_port=$(($JOURNALNODE_HTTP_ADDRESS_BASE + $i - 1))
+    addXMLProperty $hdfs_site_xml "dfs.journalnode.http-address" "0.0.0.0:$http_port"
+
     
     #Env configuration
     pidDir=$node_data_dir/pid
     mkdir $pidDir
-    addProperty $yarn_env $VAR_PREFIX"_PID_DIR" "$pidDir"
+    addProperty $hadoop_env "HADOOP_PID_DIR" "$pidDir"
     
-    jmx_port=$(($RESOURCEMANAGER_JMX_PORT_BASE + $i - 1))
-    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
-    addProperty $yarn_env "YARN_RESOURCEMANAGER_OPTS" "\"$jmx_prop\""
+    jmx_port=$(($JOURNALNODE_JMX_PORT_BASE + $i - 1))
+    jmx_prop="$HADOOP_JOURNALNODE_OPTS -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+    addProperty $hadoop_env "HADOOP_JOURNALNODE_OPTS" "\"$jmx_prop\""
 	
-    debug_port=$(($RESOURCEMANAGER_DEBUG_PORT_BASE + $i - 1))
-    debug_prop="\$YARN_RESOURCEMANAGER_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
-    addProperty $yarn_env "YARN_RESOURCEMANAGER_OPTS" "\"$debug_prop\""
-done
-}
-configure_nodemanager()
-{
-println "Configure node manager"
-for (( i=1; i<=$NUMBER_OF_NODEMANAGER; i++ ))
-do
-    node_instance_dir=$INSTANCES/nodeManager$i
-    node_data_dir=$DATAS/nodeManagerData$i
-    core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
-    yarn_site_xml=$node_instance_dir/etc/hadoop/yarn-site.xml    
-    yarn_env=$node_instance_dir/etc/hadoop/yarn-env.sh
-    
-    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://$THIS_MACHINE_IP:$NAMENODE_IPC_ADDRESS_BASE"  
-    
-    tempDir=$node_data_dir/temp
-    mkdir $tempDir
-    addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir"
-    
-    addXMLProperty $yarn_site_xml "yarn.nodemanager.hostname" "0.0.0.0"
-    
-    nodemanager_address_port=$(($NODEMANAGER_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.nodemanager.address" "\${yarn.nodemanager.hostname}:$nodemanager_address_port"
-    
-    nodemanager_localizer_address_port=$(($NODEMANAGER_LOCALIZER_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.nodemanager.localizer.address" "\${yarn.nodemanager.hostname}:$nodemanager_localizer_address_port"
-    
-    nodemanager_webapp_address_port=$(($NODEMANAGER_WEBAPP_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.nodemanager.webapp.address" "\${yarn.nodemanager.hostname}:$nodemanager_webapp_address_port"    
-    
-    VAR_PREFIX="HADOOP"
-    if [ $HADOOP2 = 'true' ]; then
-	    VAR_PREFIX="YARN"
-	  fi
-    #Env configuration
-    pidDir=$node_data_dir/pid
-    mkdir $pidDir
-    addProperty $yarn_env $VAR_PREFIX"_PID_DIR" "$pidDir"
-    
-    jmx_port=$(($NODEMANAGER_JMX_PORT_BASE + $i - 1))
-    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
-    addProperty $yarn_env "YARN_NODEMANAGER_OPTS" "\"$jmx_prop\""
-	
-    debug_port=$(($NODEMANAGER_DEBUG_PORT_BASE + $i - 1))
-    debug_prop="\$YARN_NODEMANAGER_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
-    addProperty $yarn_env "YARN_NODEMANAGER_OPTS" "\"$debug_prop\""
+    debug_port=$(($JOURNALNODE_DEBUG_PORT_BASE + $i - 1))
+    debug_prop="\$HADOOP_JOURNALNODE_OPTS -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
+    addProperty $hadoop_env "HADOOP_JOURNALNODE_OPTS" "\"$debug_prop\""
 done
 }
 
@@ -378,7 +323,8 @@ start_stop_namenode()
   for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
   do
      node_instance_dir=$INSTANCES/nameNode$i
-     if [ $action = 'start' ]; then
+     if [ $action = 'start' ] && [ "1" = $i ]; then
+        echo "formatting name node now"
         node_data_dir=$DATAS/nameNodeData$i
         #Formate name node only when directory current does not exist
         if [ ! -d $node_data_dir/name/current ]; then
@@ -405,30 +351,17 @@ start_stop_datanode()
      fi
   done 
 }
-start_stop_resourcemanager()
+start_stop_journalnode()
 {
   action=$1
-  for (( i=1; i<=$NUMBER_OF_RESOURCEMANAGER; i++ ))
+  for (( i=1; i<=$NUMBER_OF_JOURNALNODE; i++ ))
   do
-     node_instance_dir=$INSTANCES/resourceManager$i
+     node_instance_dir=$INSTANCES/journalNode$i
      if [ $HADOOP2 = 'true' ]; then
-        $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop $action resourcemanager
+        $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop $action journalnode
      else
-        $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon $action resourcemanager
+        $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon $action journalnode
      fi
-  done   
-}
-start_stop_nodemanager()
-{
-  action=$1
-  for (( i=1; i<=$NUMBER_OF_NODEMANAGER; i++ ))
-  do
-     node_instance_dir=$INSTANCES/nodeManager$i
-     if [ $HADOOP2 = 'true' ]; then
-        $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop $action nodemanager
-     else
-        $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon $action nodemanager
-     fi 
   done   
 }
 restart_()
