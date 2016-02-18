@@ -31,11 +31,15 @@ DATANODE_JMX_PORT_BASE=5510
 DATANODE_DEBUG_PORT_BASE=4410
 
 #Journal node ports
-JOURNALNODE_IPC_ADDRESS_BASE=8480
-JOURNALNODE_HTTP_ADDRESS_BASE=8485
+JOURNALNODE_IPC_ADDRESS_BASE=8485
+JOURNALNODE_HTTP_ADDRESS_BASE=8480
 JOURNALNODE_HTTPS_ADDRESS_BASE=8491
 JOURNALNODEJMX_PORT_BASE=5540
 JOURNALNODE_DEBUG_PORT_BASE=4450
+
+#Miscellaneous ports
+ZKFC_PORT_BASE=8019
+ZK_CLIENT_PORT_BASE=2181
 
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
@@ -147,6 +151,10 @@ do
     addXMLProperty $hdfs_site_xml "dfs.client.failover.proxy.provider.mycluster" "org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider"
     addXMLProperty $hdfs_site_xml "dfs.ha.fencing.methods" "sshfence"
     addXMLProperty $hdfs_site_xml "dfs.ha.fencing.ssh.private-key-files" "/root/.ssh/id_rsa"
+    addXMLProperty $hdfs_site_xml "dfs.ha.automatic-failover.enabled" "true"
+    addXMLProperty $hdfs_site_xml "ha.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZK_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZK_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZK_CLIENT_PORT_BASE + 2))"
+    zkfc_port=$(($ZKFC_PORT_BASE + $i - 1))
+    addXMLProperty $hdfs_site_xml "dfs.ha.zkfc.port" "$zkfc_port"
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
@@ -329,11 +337,23 @@ start_stop_namenode()
         #Formate name node only when directory current does not exist
         if [ ! -d $node_data_dir/name/current ]; then
           $node_instance_dir/bin/hdfs namenode -format
+          $node_instance_dir/bin/hdfs zkfc -formatZK -nonInteractive
+          $node_instance_dir/bin/hdfs namenode -initializeSharedEdits -nonInteractive          
+        fi
+     fi
+     if [ $action = 'start' ] && [ "2" = $i ]; then
+        echo "formatting name node now"
+        node_data_dir=$DATAS/nameNodeData$i
+        #Formate name node only when directory current does not exist
+        if [ ! -d $node_data_dir/name/current ]; then
+          $node_instance_dir/bin/hdfs namenode -bootstrapStandby -nonInteractive          
         fi
      fi
      if [ $HADOOP2 = 'true' ]; then
+        $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs $action zkfc
         $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs $action namenode
      else
+        $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon $action zkfc
         $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon $action namenode
      fi
   done 
