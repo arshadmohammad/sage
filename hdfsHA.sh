@@ -116,6 +116,17 @@ addXMLProperty()
   property_xml="\t<property>\n\t\t<name>$2</name>\n\t\t<value>$3</value>\n\t</property>\n</configuration>"
   sed -i "s|</configuration>|$property_xml|" $1
 }
+addAllXMLProperty()
+{
+  xmlFile=$1
+  propertyFile=$2
+  cat $propertyFile | while read line
+  do
+    key=$(echo $line| cut -d "=" -f1)
+    value=$(echo $line| cut -d "=" -f2 | tr -d '\r' | tr -d '\n')
+    addXMLProperty  $xmlFile $key $value
+  done
+}
 # file, key, value
 addProperty()
 {
@@ -132,13 +143,10 @@ do
     hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
     hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
     
-    addXMLProperty $hdfs_site_xml "dfs.nameservices" "mycluster"
-    addXMLProperty $hdfs_site_xml "dfs.ha.namenodes.mycluster" "nn1,nn2"
     addXMLProperty $hdfs_site_xml "dfs.ha.namenode.id" "nn"$i
     name_node_rpc_port1=$(($NAMENODE_IPC_ADDRESS_BASE ))
-    name_node_rpc_port2=$(($NAMENODE_IPC_ADDRESS_BASE + 1))
+    name_node_rpc_port2=$(($NAMENODE_IPC_ADDRESS_BASE + 1))   
     
-    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://mycluster" 
     addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn1" "$THIS_MACHINE_IP:$name_node_rpc_port1"
     addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn2" "$THIS_MACHINE_IP:$name_node_rpc_port2"
     
@@ -148,10 +156,6 @@ do
     addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn2" "0.0.0.0:$http_port2"
     
     addXMLProperty $hdfs_site_xml "dfs.namenode.shared.edits.dir" "qjournal://$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 1));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 2))/mycluster"
-    addXMLProperty $hdfs_site_xml "dfs.client.failover.proxy.provider.mycluster" "org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider"
-    addXMLProperty $hdfs_site_xml "dfs.ha.fencing.methods" "sshfence"
-    addXMLProperty $hdfs_site_xml "dfs.ha.fencing.ssh.private-key-files" "/root/.ssh/id_rsa"
-    addXMLProperty $hdfs_site_xml "dfs.ha.automatic-failover.enabled" "true"
     addXMLProperty $hdfs_site_xml "ha.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZK_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZK_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZK_CLIENT_PORT_BASE + 2))"
     zkfc_port=$(($ZKFC_PORT_BASE + $i - 1))
     addXMLProperty $hdfs_site_xml "dfs.ha.zkfc.port" "$zkfc_port"
@@ -160,8 +164,6 @@ do
     mkdir $tempDir
     addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir" 
      
-    addXMLProperty $hdfs_site_xml "dfs.replication" "$REPLICATION"
-    
     nameDir=$node_data_dir/name
     mkdir $nameDir
     addXMLProperty $hdfs_site_xml "dfs.namenode.name.dir" "$nameDir"    
@@ -169,8 +171,10 @@ do
     editDir=$node_data_dir/edit
     mkdir $editDir
     addXMLProperty $hdfs_site_xml "dfs.namenode.edits.dir" "$editDir"
-
-    
+     
+    #Static configuration
+    addAllXMLProperty $core_site_xml "core.properties"
+    addAllXMLProperty $hdfs_site_xml "hdfs.properties"
     
     #Env configuration
     pidDir=$node_data_dir/pid
@@ -198,13 +202,9 @@ do
     hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
     hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
     
-    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://$THIS_MACHINE_IP:$NAMENODE_IPC_ADDRESS_BASE"  
-    
     tempDir=$node_data_dir/temp
     mkdir $tempDir
     addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir"    
-    
-    addXMLProperty $hdfs_site_xml "dfs.replication" "$REPLICATION"
     
     dataDir=$node_data_dir/data
     mkdir $dataDir
@@ -218,6 +218,10 @@ do
     
     data_node_ipc_port=$(($DATANODE_IPC_ADDRESS_BASE + $i - 1))
     addXMLProperty $hdfs_site_xml "dfs.datanode.ipc.address" "0.0.0.0:$data_node_ipc_port"
+    
+    #Static configuration
+    addAllXMLProperty $core_site_xml "core.properties"
+    addAllXMLProperty $hdfs_site_xml "hdfs.properties"
     
     #Env configuration
     pidDir=$node_data_dir/pid
@@ -384,6 +388,19 @@ start_stop_journalnode()
      fi
   done   
 }
+tests_()
+{
+  for (( i=1; i<=2; i++ ))
+do
+    node_instance_dir=$INSTANCES/nameNode$i
+    node_data_dir=$DATAS/nameNodeData$i
+    core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
+    hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
+    hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
+    addAllXMLProperty $core_site_xml "core.properties"
+    addAllXMLProperty $hdfs_site_xml "hdfs.properties"
+done    
+}
 restart_()
 {
   stop_
@@ -417,6 +434,9 @@ case $1 in
       ;;
   printports)
       printports_
+      ;;
+  tests)
+      tests_
       ;;
   *)
   echo "Usage: $0 {install|start|stop|restart|status|printports}" >&2
