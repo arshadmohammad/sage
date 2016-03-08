@@ -1,13 +1,6 @@
-basedir=`dirname $0`
-if [ "${basedir}" = "." ]
-then
-    basedir=`pwd`
-elif [ "${basedir}" = ".." ]
-then
-    basedir=`(cd .. ;pwd)`
-fi
+source commonScript.sh
 #Modify this if want take custome location as base directory
-BASE_DIR=$basedir
+BASE_DIR=`getBaseDir`
 
 INSTALLATION_BASE_DIR=$BASE_DIR/hadoop
 RESOURCE_DIR=$BASE_DIR/resources
@@ -16,7 +9,6 @@ NUMBER_OF_NAMENODE=2
 NUMBER_OF_DATANODE=3
 NUMBER_OF_JOURNALNODE=3
 
-REPLICATION=3
 #Name node ports
 NAMENODE_HTTP_ADDRESS_BASE=50070
 NAMENODE_IPC_ADDRESS_BASE=9000
@@ -47,50 +39,49 @@ THIS_MACHINE_IP=192.168.1.3
 # is the release from hadoop branch-2
 HADOOP2=true
 
-install_()
+install.hadoop()
 {
   #Prepare installation directory structure
   
   if [ -d $INSTALLATION_BASE_DIR ]; then
-	stop_
+	stop.hadoop
 	rm -r $INSTALLATION_BASE_DIR
   fi
   mkdir $INSTALLATION_BASE_DIR
   mkdir $DATAS
   mkdir $INSTANCES    
-  extract_hadoop
-  configure_hadoop
+  extract.hadoop
+  configure.hadoop
 }
-extract_hadoop()
+extract.hadoop()
 {
   extractModule "nameNode" $NUMBER_OF_NAMENODE
   extractModule "dataNode" $NUMBER_OF_DATANODE
   extractModule "journalNode" $NUMBER_OF_JOURNALNODE
 }
-configure_hadoop()
+configure.hadoop()
 {
-  configure_namenode
-  configure_datanode
-  configure_journalnode
+  configure.namenode
+  configure.datanode
+  configure.journalnode
 }
-start_()
+start.hadoop()
 {
-  start_stop_journalnode start
-  start_stop_namenode start
-  start_stop_datanode start  
+  start.stop.journalnode start
+  start.stop.namenode start
+  start.stop.datanode start  
 }
-stop_()
+stop.hadoop()
 {
-  start_stop_datanode stop
-  start_stop_namenode stop 
-  start_stop_journalnode stop
+  start.stop.datanode stop
+  start.stop.namenode stop 
+  start.stop.journalnode stop
 }
-
 extractModule()
 {
   module=$1
   count=$2
-  println "Extracting $module"
+  echo "Extracting $module"
   for (( i=1; i<=$count; i++ ))
   do
     #create module directory and extract release to this
@@ -110,31 +101,9 @@ extractModule()
     mkdir $node_data_dir
   done
 }
-# file, key, value
-addXMLProperty()
+configure.namenode()
 {
-  property_xml="\t<property>\n\t\t<name>$2</name>\n\t\t<value>$3</value>\n\t</property>\n</configuration>"
-  sed -i "s|</configuration>|$property_xml|" $1
-}
-addAllXMLProperty()
-{
-  xmlFile=$1
-  propertyFile=$2
-  cat $propertyFile | while read line
-  do
-    key=$(echo $line| cut -d "=" -f1)
-    value=$(echo $line| cut -d "=" -f2 | tr -d '\r' | tr -d '\n')
-    addXMLProperty  $xmlFile $key $value
-  done
-}
-# file, key, value
-addProperty()
-{
-  echo "export $2=$3" >> $1  
-}
-configure_namenode()
-{
-println "Configure name node"
+echo "Configure name node"
 for (( i=1; i<=2; i++ ))
 do
     node_instance_dir=$INSTANCES/nameNode$i
@@ -143,6 +112,7 @@ do
     hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
     hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
     
+	## common cofig for all config
     addXMLProperty $hdfs_site_xml "dfs.ha.namenode.id" "nn"$i
     name_node_rpc_port1=$(($NAMENODE_IPC_ADDRESS_BASE ))
     name_node_rpc_port2=$(($NAMENODE_IPC_ADDRESS_BASE + 1))   
@@ -154,6 +124,8 @@ do
     http_port2=$(($NAMENODE_HTTP_ADDRESS_BASE + 1))
     addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn1" "0.0.0.0:$http_port1"
     addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn2" "0.0.0.0:$http_port2"
+	#
+	
     
     addXMLProperty $hdfs_site_xml "dfs.namenode.shared.edits.dir" "qjournal://$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 1));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 2))/mycluster"
     addXMLProperty $hdfs_site_xml "ha.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZK_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZK_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZK_CLIENT_PORT_BASE + 2))"
@@ -191,9 +163,9 @@ do
 done
 }
 
-configure_datanode()
+configure.datanode()
 {
-println "Configure data node"
+echo "Configure data node"
 for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
 do
     node_instance_dir=$INSTANCES/dataNode$i
@@ -201,6 +173,20 @@ do
     core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
     hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
     hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
+	
+	## common cofig for all config
+    addXMLProperty $hdfs_site_xml "dfs.ha.namenode.id" "nn"$i
+    name_node_rpc_port1=$(($NAMENODE_IPC_ADDRESS_BASE ))
+    name_node_rpc_port2=$(($NAMENODE_IPC_ADDRESS_BASE + 1))   
+    
+    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn1" "$THIS_MACHINE_IP:$name_node_rpc_port1"
+    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn2" "$THIS_MACHINE_IP:$name_node_rpc_port2"
+    
+    http_port1=$(($NAMENODE_HTTP_ADDRESS_BASE))
+    http_port2=$(($NAMENODE_HTTP_ADDRESS_BASE + 1))
+    addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn1" "0.0.0.0:$http_port1"
+    addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn2" "0.0.0.0:$http_port2"
+	#
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
@@ -237,9 +223,9 @@ do
     addProperty $hadoop_env "HADOOP_DATANODE_OPTS" "\"$debug_prop\""
 done
 }
-configure_journalnode()
+configure.journalnode()
 {
-println "Configure journal node"
+echo "Configure journal node"
 for (( i=1; i<=$NUMBER_OF_JOURNALNODE; i++ ))
 do
     node_instance_dir=$INSTANCES/journalNode$i
@@ -278,12 +264,7 @@ do
 done
 }
 
-println()
-{
-    echo $1
-    echo ""
-}
-printports_()
+printports.hadoop()
 {
 for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
 do
@@ -329,7 +310,7 @@ do
 done
 }
 
-start_stop_namenode()
+start.stop.namenode()
 {
   action=$1
   for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
@@ -362,7 +343,7 @@ start_stop_namenode()
      fi
   done 
 }
-start_stop_datanode()
+start.stop.datanode()
 {
   action=$1
   for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
@@ -375,7 +356,7 @@ start_stop_datanode()
      fi
   done 
 }
-start_stop_journalnode()
+start.stop.journalnode()
 {
   action=$1
   for (( i=1; i<=$NUMBER_OF_JOURNALNODE; i++ ))
@@ -388,7 +369,7 @@ start_stop_journalnode()
      fi
   done   
 }
-tests_()
+tests.hadoop()
 {
   for (( i=1; i<=2; i++ ))
 do
@@ -401,42 +382,42 @@ do
     addAllXMLProperty $hdfs_site_xml "hdfs.properties"
 done    
 }
-restart_()
+restart.hadoop()
 {
-  stop_
-  start_    
+  stop.hadoop
+  start.hadoop    
 }
-status_()
+status.hadoop()
 {
   jps
 }
 case $1 in
   install)
-      install_
+      install.hadoop
       ;;
   reinstall)
-      install_
-      start_
+      install.hadoop
+      start.hadoop
       sleep 2
-      status_
+      status.hadoop
       ;;
   start)
-      start_
+      start.hadoop
       ;;
   stop)
-      stop_
+      stop.hadoop
       ;;
   restart)
-      restart_
+      restart.hadoop
       ;;
   status)
-      status_
+      status.hadoop
       ;;
   printports)
-      printports_
+      printports.hadoop
       ;;
   tests)
-      tests_
+      tests.hadoop
       ;;
   *)
   echo "Usage: $0 {install|start|stop|restart|status|printports}" >&2

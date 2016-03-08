@@ -1,13 +1,6 @@
-basedir=`dirname $0`
-if [ "${basedir}" = "." ]
-then
-    basedir=`pwd`
-elif [ "${basedir}" = ".." ]
-then
-    basedir=`(cd .. ;pwd)`
-fi
+source commonScript.sh
 #Modify this if want take custome location as base directory
-BASE_DIR=$basedir
+BASE_DIR=`getBaseDir`
 INSTALLATION_BASE_DIR=$BASE_DIR/zk
 RESOURCE_DIR=$BASE_DIR/resources
 ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.6.0-SNAPSHOT.tar.gz
@@ -24,8 +17,7 @@ INSTANCES=$INSTALLATION_BASE_DIR/instances
 AUTHENTION=true
 SECURE=true
 
-
-install_()
+install.zookeeper()
 {
     # Prepare installation directory structure
 	if [ -d $INSTALLATION_BASE_DIR ]; then
@@ -36,7 +28,7 @@ install_()
     mkdir $INSTANCES
 
     # Extract release
-    println "Creating installation folder structure"
+    echo "Creating installation folder structure"
     for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
     do
         zoo_instance_dir=$INSTANCES/zookeeper$i
@@ -55,13 +47,17 @@ install_()
 		if [ ! -f $zoo_instance_dir/lib/slf4j-log4j12-1.7.5.jar ]; then 
 			cp $RESOURCE_DIR/zookeeper/lib/slf4j-log4j12-1.7.5.jar $zoo_instance_dir/lib/
 		fi
-		
     done
+    configure.zookeeper
+
+}
+configure.zookeeper()
+{
 
     # Create dynamic configuration
     dynamic_config_file="dynamic_zoo.cfg.dynamic"
     rm -f $dynamic_config_file
-    println "Creating dynamic configuration"
+    echo "Creating dynamic configuration"
     echo "#Zookeeper dynamic configuration" >> $dynamic_config_file
     for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
     do
@@ -73,7 +69,7 @@ install_()
     done
 
     # Create server ids
-    println "Creating server ids"
+    echo "Creating server ids"
     for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
     do
         server_id=$i
@@ -83,7 +79,7 @@ install_()
 
 
     #Copy resources
-    println "Copying resources"
+    echo "Copying resources"
     for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
     do
       zoo_instance_dir=$INSTANCES/zookeeper$i 
@@ -100,7 +96,7 @@ install_()
     done
 
     #Modify configuration properties
-    println "Modifying configuration properties"
+    echo "Modifying configuration properties"
     for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
     do
         zoo_instance_dir=$INSTANCES/zookeeper$i
@@ -151,7 +147,7 @@ install_()
           echo "authProvider.sasl=org.apache.zookeeper.server.auth.SASLAuthenticationProvider" >> $zoo_cfg_file
           echo "export CLIENT_JVMFLAGS=\"\$CLIENT_JVMFLAGS -Djava.security.auth.login.config=$jaas_location -Djava.security.krb5.conf=$krb5_location -Dsun.security.krb5.debug=true -Dzookeeper.server.principal=zookeeper/hadoop.com\"" >> $env_file
         fi
-        
+		
         jmx_port=$(($JMX_PORT_BASE + $i - 1))
         echo "export JMXPORT=\"$jmx_port\"" >> $env_file  
            
@@ -160,18 +156,16 @@ install_()
         debug_options="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
         sed -i "s|nohup \"\$JAVA\" \$ZOO_DATADIR_AUTOCREATE|nohup \"\$JAVA\" \$ZOO_DATADIR_AUTOCREATE $debug_options|" $server_file
 		
+		#static configuration
+		addAllProperty zk.properties $zoo_cfg_file
+		
     done
 	
 	# Do cleanup
 	rm $dynamic_config_file
+}
 
-}
-println()
-{
-    echo $1
-    echo ""
-}
-printports_()
+printports.zookeeper()
 {
 for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
     do
@@ -187,7 +181,6 @@ for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
         echo "secureClientPort="$secure_client_port
         echo "admin.serverPort="$admin_port
         echo "jmx_port="$jmx_port
-        println
     done
 
 }
@@ -202,50 +195,50 @@ do
 done
 
 }
-start_()
+start.zookeeper()
 {
-  println "Starting ZooKeeper servers"
+  echo "Starting ZooKeeper servers"
   runCommand "start"
 }
-stop_()
+stop.zookeeper()
 {
-  println "Stopping ZooKeeper servers"
+  echo "Stopping ZooKeeper servers"
   runCommand "stop"
 }
-restart_()
+restart.zookeeper()
 {
   runCommand "restart"
 }
-status_()
+status.zookeeper()
 {
   runCommand "status"
 }
 
 case $1 in
 install)
-    install_
+    install.zookeeper
     ;;
 reinstall)
-    stop_
-    install_
-    start_
+    stop.zookeeper
+    install.zookeeper
+    start.zookeeper
     sleep 2
-    status_
+    status.zookeeper
     ;;
 start)
-    start_
+    start.zookeeper
     ;;
 stop)
-    stop_
+    stop.zookeeper
     ;;
 restart)
-    restart_
+    restart.zookeeper
     ;;
 status)
-    status_
+    status.zookeeper
     ;;
 printports)
-    printports_
+    printports.zookeeper
     ;;
 *)
     echo "Usage: $0 {install|start|stop|restart|status|printports}" >&2
