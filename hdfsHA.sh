@@ -9,73 +9,49 @@ NUMBER_OF_NAMENODE=2
 NUMBER_OF_DATANODE=3
 NUMBER_OF_JOURNALNODE=3
 
-#Name node ports
-NAMENODE_HTTP_ADDRESS_BASE=50070
-NAMENODE_IPC_ADDRESS_BASE=9000
-NAMENODE_JMX_PORT_BASE=5500
-NAMENODE_DEBUG_PORT_BASE=4400
-
-#Data node ports
-DATANODE_HTTP_ADDRESS_BASE=50075
-DATANODE_ADDRESS_BASE=50010
-DATANODE_IPC_ADDRESS_BASE=50020
-DATANODE_JMX_PORT_BASE=5510
-DATANODE_DEBUG_PORT_BASE=4410
-
-#Journal node ports
-JOURNALNODE_IPC_ADDRESS_BASE=8485
-JOURNALNODE_HTTP_ADDRESS_BASE=8480
-JOURNALNODE_HTTPS_ADDRESS_BASE=8491
-JOURNALNODEJMX_PORT_BASE=5540
-JOURNALNODE_DEBUG_PORT_BASE=4450
-
-#Miscellaneous ports
-ZKFC_PORT_BASE=8019
-ZK_CLIENT_PORT_BASE=2181
-
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 THIS_MACHINE_IP=192.168.1.3
 # is the release from hadoop branch-2
 HADOOP2=true
 
-install.hadoop()
+install_hadoop()
 {
   #Prepare installation directory structure
   
   if [ -d $INSTALLATION_BASE_DIR ]; then
-	stop.hadoop
+	stop_hadoop
 	rm -r $INSTALLATION_BASE_DIR
   fi
   mkdir $INSTALLATION_BASE_DIR
   mkdir $DATAS
   mkdir $INSTANCES    
-  extract.hadoop
-  configure.hadoop
+  extract_hadoop
+  configure_hadoop
 }
-extract.hadoop()
+extract_hadoop()
 {
   extractModule "nameNode" $NUMBER_OF_NAMENODE
   extractModule "dataNode" $NUMBER_OF_DATANODE
   extractModule "journalNode" $NUMBER_OF_JOURNALNODE
 }
-configure.hadoop()
+configure_hadoop()
 {
-  configure.namenode
-  configure.datanode
-  configure.journalnode
+  configure_namenode
+  configure_datanode
+  configure_journalnode
 }
-start.hadoop()
+start_hadoop()
 {
-  start.stop.journalnode start
-  start.stop.namenode start
-  start.stop.datanode start  
+  start_stop_journalnode start
+  start_stop_namenode start
+  start_stop_datanode start  
 }
-stop.hadoop()
+stop_hadoop()
 {
-  start.stop.datanode stop
-  start.stop.namenode stop 
-  start.stop.journalnode stop
+  start_stop_datanode stop
+  start_stop_namenode stop 
+  start_stop_journalnode stop
 }
 extractModule()
 {
@@ -101,7 +77,7 @@ extractModule()
     mkdir $node_data_dir
   done
 }
-configure.namenode()
+configure_namenode()
 {
 echo "Configure name node"
 for (( i=1; i<=2; i++ ))
@@ -128,7 +104,7 @@ do
 	
     
     addXMLProperty $hdfs_site_xml "dfs.namenode.shared.edits.dir" "qjournal://$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 1));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 2))/mycluster"
-    addXMLProperty $hdfs_site_xml "ha.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZK_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZK_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZK_CLIENT_PORT_BASE + 2))"
+    addXMLProperty $hdfs_site_xml "ha.zookeeper.quorum" "$THIS_MACHINE_IP:$(($CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($CLIENT_PORT_BASE + 2))"
     zkfc_port=$(($ZKFC_PORT_BASE + $i - 1))
     addXMLProperty $hdfs_site_xml "dfs.ha.zkfc.port" "$zkfc_port"
     
@@ -163,7 +139,7 @@ do
 done
 }
 
-configure.datanode()
+configure_datanode()
 {
 echo "Configure data node"
 for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
@@ -223,7 +199,7 @@ do
     addProperty $hadoop_env "HADOOP_DATANODE_OPTS" "\"$debug_prop\""
 done
 }
-configure.journalnode()
+configure_journalnode()
 {
 echo "Configure journal node"
 for (( i=1; i<=$NUMBER_OF_JOURNALNODE; i++ ))
@@ -264,7 +240,7 @@ do
 done
 }
 
-printports.hadoop()
+printports_hadoop()
 {
 for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
 do
@@ -310,7 +286,7 @@ do
 done
 }
 
-start.stop.namenode()
+start_stop_namenode()
 {
   action=$1
   for (( i=1; i<=$NUMBER_OF_NAMENODE; i++ ))
@@ -343,7 +319,7 @@ start.stop.namenode()
      fi
   done 
 }
-start.stop.datanode()
+start_stop_datanode()
 {
   action=$1
   for (( i=1; i<=$NUMBER_OF_DATANODE; i++ ))
@@ -356,7 +332,7 @@ start.stop.datanode()
      fi
   done 
 }
-start.stop.journalnode()
+start_stop_journalnode()
 {
   action=$1
   for (( i=1; i<=$NUMBER_OF_JOURNALNODE; i++ ))
@@ -369,7 +345,7 @@ start.stop.journalnode()
      fi
   done   
 }
-tests.hadoop()
+tests_hadoop()
 {
   for (( i=1; i<=2; i++ ))
 do
@@ -382,42 +358,42 @@ do
     addAllXMLProperty $hdfs_site_xml "hdfs.properties"
 done    
 }
-restart.hadoop()
+restart_hadoop()
 {
-  stop.hadoop
-  start.hadoop    
+  stop_hadoop
+  start_hadoop    
 }
-status.hadoop()
+status_hadoop()
 {
   jps
 }
 case $1 in
   install)
-      install.hadoop
+      install_hadoop
       ;;
   reinstall)
-      install.hadoop
-      start.hadoop
+      install_hadoop
+      start_hadoop
       sleep 2
-      status.hadoop
+      status_hadoop
       ;;
   start)
-      start.hadoop
+      start_hadoop
       ;;
   stop)
-      stop.hadoop
+      stop_hadoop
       ;;
   restart)
-      restart.hadoop
+      restart_hadoop
       ;;
   status)
-      status.hadoop
+      status_hadoop
       ;;
   printports)
-      printports.hadoop
+      printports_hadoop
       ;;
   tests)
-      tests.hadoop
+      tests_hadoop
       ;;
   *)
   echo "Usage: $0 {install|start|stop|restart|status|printports}" >&2

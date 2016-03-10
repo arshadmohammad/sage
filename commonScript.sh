@@ -1,3 +1,4 @@
+source installConf.sh
 getBaseDir()
 {
 	basedir=`dirname $0`

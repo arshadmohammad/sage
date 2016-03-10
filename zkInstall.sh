@@ -5,19 +5,12 @@ INSTALLATION_BASE_DIR=$BASE_DIR/zk
 RESOURCE_DIR=$BASE_DIR/resources
 ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.6.0-SNAPSHOT.tar.gz
 NUMBER_OF_INSTANCES=3
-CLIENT_PORT_BASE=2181
-CLIENT_SECURE_PORT_BASE=3181
-PEER_COM_PORT_BASE=2888
-LEADER_ELEC_PORT_BASE=3888
-ADMIN_SERVER_PORT_BASE=4088
-JMX_PORT_BASE=6610
-DEBUG_PORT_BASE=4455
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 AUTHENTION=true
 SECURE=true
 
-install.zookeeper()
+install_zookeeper()
 {
     # Prepare installation directory structure
 	if [ -d $INSTALLATION_BASE_DIR ]; then
@@ -48,10 +41,10 @@ install.zookeeper()
 			cp $RESOURCE_DIR/zookeeper/lib/slf4j-log4j12-1.7.5.jar $zoo_instance_dir/lib/
 		fi
     done
-    configure.zookeeper
+    configure_zookeeper
 
 }
-configure.zookeeper()
+configure_zookeeper()
 {
 
     # Create dynamic configuration
@@ -165,7 +158,7 @@ configure.zookeeper()
 	rm $dynamic_config_file
 }
 
-printports.zookeeper()
+printports_zookeeper()
 {
 for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
     do
@@ -195,50 +188,50 @@ do
 done
 
 }
-start.zookeeper()
+start_zookeeper()
 {
   echo "Starting ZooKeeper servers"
   runCommand "start"
 }
-stop.zookeeper()
+stop_zookeeper()
 {
   echo "Stopping ZooKeeper servers"
   runCommand "stop"
 }
-restart.zookeeper()
+restart_zookeeper()
 {
   runCommand "restart"
 }
-status.zookeeper()
+status_zookeeper()
 {
   runCommand "status"
 }
 
 case $1 in
 install)
-    install.zookeeper
+    install_zookeeper
     ;;
 reinstall)
-    stop.zookeeper
-    install.zookeeper
-    start.zookeeper
+    stop_zookeeper
+    install_zookeeper
+    start_zookeeper
     sleep 2
-    status.zookeeper
+    status_zookeeper
     ;;
 start)
-    start.zookeeper
+    start_zookeeper
     ;;
 stop)
-    stop.zookeeper
+    stop_zookeeper
     ;;
 restart)
-    restart.zookeeper
+    restart_zookeeper
     ;;
 status)
-    status.zookeeper
+    status_zookeeper
     ;;
 printports)
-    printports.zookeeper
+    printports_zookeeper
     ;;
 *)
     echo "Usage: $0 {install|start|stop|restart|status|printports}" >&2
