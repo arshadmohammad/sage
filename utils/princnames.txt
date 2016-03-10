@@ -4,9 +4,11 @@ dn/hadoop.com dn
 rm/hadoop.com rm
 nm/hadoop.com nm
 jhs/hadoop.com jhs
+zookeeper/192.168.1.3 zookeeper
 zookeeper/hadoop.com zookeeper
 zookeeper2/hadoop.com zookeeper2
 zookeeper3/hadoop.com zookeeper3
+zkcli zkcli
 zkcli/hadoop.com zkcli
 zkcli2/hadoop.com zkcli3
 zkcli3/hadoop.com zkcli3
