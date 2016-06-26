@@ -9,7 +9,8 @@ DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 AUTHENTION=true
 SECURE=true
-
+THIS_MACHINE_IP=192.168.1.3
+BRANCH_3_4=true
 install_zookeeper()
 {
     # Prepare installation directory structure
@@ -57,7 +58,7 @@ configure_zookeeper()
         server_id=$i
         peer_port=$(($PEER_COM_PORT_BASE + $i - 1))
         leader_elec_port=$(($LEADER_ELEC_PORT_BASE + $i - 1))
-        dynamic_config_part="server.$server_id=localhost:$peer_port:$leader_elec_port:participant"
+        dynamic_config_part="server.$server_id=$THIS_MACHINE_IP:$peer_port:$leader_elec_port:participant"
         echo "$dynamic_config_part" >> $dynamic_config_file
     done
 
@@ -94,7 +95,7 @@ configure_zookeeper()
     do
         zoo_instance_dir=$INSTANCES/zookeeper$i
         cp $zoo_instance_dir/conf/zoo_sample.cfg $zoo_instance_dir/conf/zoo.cfg
-        zoo_cfg_file=$zoo_instance_dir/conf/zoo.cfg    
+        zoo_cfg_file=$zoo_instance_dir/conf/zoo.cfg   
         
         data_dir_location=$DATAS/data$i
         sed -i "s|dataDir=.*|dataDir=$data_dir_location|" $zoo_cfg_file    
@@ -114,10 +115,14 @@ configure_zookeeper()
         fi        
         
         admin_port=$(($ADMIN_SERVER_PORT_BASE + $i - 1))
-        echo "admin.serverPort=$admin_port" >> $zoo_cfg_file        
-        
-        dynamic_file_location=$zoo_instance_dir/conf/$dynamic_config_file
-        echo "dynamicConfigFile=$dynamic_file_location" >> $zoo_cfg_file        
+        echo "admin.serverPort=$admin_port" >> $zoo_cfg_file
+		dynamic_file_location=$zoo_instance_dir/conf/$dynamic_config_file
+        if [ $BRANCH_3_4 = 'true' ]; then
+			cat $dynamic_config_file >> $zoo_cfg_file 
+		else
+			echo "dynamicConfigFile=$dynamic_file_location" >> $zoo_cfg_file 
+		fi
+               
         
         #static configurations
         if [ $SECURE = 'true' ]; then
@@ -129,6 +134,9 @@ configure_zookeeper()
         fi 
         
         env_file=$zoo_instance_dir/bin/zkEnv.sh
+		if [ $BRANCH_3_4 = 'true' ]; then
+			echo "" >> $env_file 		
+		fi
         sed -i "s/ZOO_LOG4J_PROP=.*/ZOO_LOG4J_PROP=\"INFO,ROLLINGFILE\"/" $env_file
 		log4j_file=$zoo_instance_dir/conf/log4j.properties
 		sed -i "s|INFO|INFO|" $log4j_file
@@ -147,7 +155,12 @@ configure_zookeeper()
         server_file=$zoo_instance_dir/bin/zkServer.sh
         debug_port=$(($DEBUG_PORT_BASE + $i - 1))
         debug_options="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
-        sed -i "s|nohup \"\$JAVA\" \$ZOO_DATADIR_AUTOCREATE|nohup \"\$JAVA\" \$ZOO_DATADIR_AUTOCREATE $debug_options|" $server_file
+		if [ $BRANCH_3_4 = 'true' ]; then
+			sed -i "s|nohup \"\$JAVA\"|nohup \"\$JAVA\" $debug_options|" $server_file
+		else
+			sed -i "s|nohup \"\$JAVA\" \$ZOO_DATADIR_AUTOCREATE|nohup \"\$JAVA\" \$ZOO_DATADIR_AUTOCREATE $debug_options|" $server_file
+		fi
+        
 		
 		#static configuration
 		addAllProperty zk.properties $zoo_cfg_file
@@ -169,7 +182,7 @@ for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
         secure_client_port=$(($CLIENT_SECURE_PORT_BASE + $i - 1))
         admin_port=$(($ADMIN_SERVER_PORT_BASE + $i - 1))
         jmx_port=$(($JMX_PORT_BASE + $i - 1))
-        echo server.$server_id=localhost:$peer_port:$leader_elec_port:participant;
+        echo server.$server_id=$THIS_MACHINE_IP:$peer_port:$leader_elec_port:participant;
         echo "clientPort="$client_port
         echo "secureClientPort="$secure_client_port
         echo "admin.serverPort="$admin_port
