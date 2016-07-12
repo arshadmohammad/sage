@@ -3,12 +3,12 @@ source commonScript.sh
 BASE_DIR=`getBaseDir`
 INSTALLATION_BASE_DIR=$BASE_DIR/zk
 RESOURCE_DIR=$BASE_DIR/resources
-ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.6.0-SNAPSHOT.tar.gz
+ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.4.9-SNAPSHOT.tar.gz
 NUMBER_OF_INSTANCES=3
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 AUTHENTION=true
-SECURE=true
+SECURE=false
 THIS_MACHINE_IP=192.168.1.3
 BRANCH_3_4=true
 install_zookeeper()
@@ -135,11 +135,12 @@ configure_zookeeper()
         
         env_file=$zoo_instance_dir/bin/zkEnv.sh
 		if [ $BRANCH_3_4 = 'true' ]; then
-			echo "" >> $env_file 		
+			echo "" >> $env_file
+			sed -i "s|ZOO_LOG_DIR=.*|ZOO_LOG_DIR=\"\$ZOOKEEPER_PREFIX/logs\"|" $env_file
 		fi
         sed -i "s/ZOO_LOG4J_PROP=.*/ZOO_LOG4J_PROP=\"INFO,ROLLINGFILE\"/" $env_file
 		log4j_file=$zoo_instance_dir/conf/log4j.properties
-		sed -i "s|INFO|INFO|" $log4j_file
+		sed -i "s|INFO|DEBUG|" $log4j_file
         
         if [ $AUTHENTION = 'true' ]; then
           jaas_location=$zoo_instance_dir/conf/jaas.conf
