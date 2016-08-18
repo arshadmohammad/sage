@@ -3,14 +3,14 @@ source commonScript.sh
 BASE_DIR=`getBaseDir`
 INSTALLATION_BASE_DIR=$BASE_DIR/zk
 RESOURCE_DIR=$BASE_DIR/resources
-ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.4.9-SNAPSHOT.tar.gz
+ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.6.0-SNAPSHOT.tar.gz
 NUMBER_OF_INSTANCES=3
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 AUTHENTION=true
 SECURE=false
 THIS_MACHINE_IP=192.168.1.3
-BRANCH_3_4=true
+BRANCH_3_4=false
 install_zookeeper()
 {
     # Prepare installation directory structure
@@ -31,16 +31,6 @@ install_zookeeper()
         
         zoo_data_dir=$DATAS/data$i
         mkdir $zoo_data_dir
-		#copy logging jars
-		if [ ! -f $zoo_instance_dir/lib/log4j-1.2.16.jar ]; then 
-			cp $RESOURCE_DIR/zookeeper/lib/log4j-1.2.16.jar $zoo_instance_dir/lib/
-		fi		
-		if [ ! -f $zoo_instance_dir/lib/slf4j-api-1.7.5.jar ]; then 
-			cp $RESOURCE_DIR/zookeeper/lib/slf4j-api-1.7.5.jar $zoo_instance_dir/lib/
-		fi
-		if [ ! -f $zoo_instance_dir/lib/slf4j-log4j12-1.7.5.jar ]; then 
-			cp $RESOURCE_DIR/zookeeper/lib/slf4j-log4j12-1.7.5.jar $zoo_instance_dir/lib/
-		fi
     done
     configure_zookeeper
 
