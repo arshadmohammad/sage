@@ -1,43 +1,24 @@
-basedir=`dirname $0`
-if [ "${basedir}" = "." ]
-then
-    basedir=`pwd`
-elif [ "${basedir}" = ".." ]
-then
-    basedir=`(cd .. ;pwd)`
-fi
+source commonScript.sh
 #Modify this if want take custome location as base directory
-BASE_DIR=$basedir
+BASE_DIR=`getBaseDir`
 
 INSTALLATION_BASE_DIR=$BASE_DIR/hbase
 RESOURCE_DIR=$BASE_DIR/resources
 HBASE_RELEASE=$BASE_DIR/hbase-2.0.0-SNAPSHOT-bin.tar.gz
-NUMBER_OF_HMASTER=1
+NUMBER_OF_HMASTER=2
 NUMBER_OF_HREGION_SERVER=3
-
-#HMaster ports
-HMASTER_PORT_BASE=16000
-HMASTER_INFO_PORT_BASE=16010
-HMASTER_JMX_PORT_BASE=5600
-HMASTER_DEBUG_PORT_BASE=4500
-
-#HRegionServer ports
-HREGION_SERVER_PORT_BASE=16020
-HREGION_SERVER_INFO_PORT_BASE=16030
-HREGION_SERVER_JMX_PORT_BASE=5620
-HREGION_SERVER_DEBUG_PORT_BASE=4520
-
+THIS_MACHINE_IP=192.168.1.3
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 HBASE_ROOTDIR="hdfs://localhost:9000/hbase"
 HBASE_ZOOKEEPER_QUORUM="localhost:2181,localhost:2182,localhost:2183"
 
-install_()
+install_hbase()
 {
   #Prepare installation directory structure
   
   if [ -d $INSTALLATION_BASE_DIR ]; then
-	stop_
+	stop_hbase
 	rm -r $INSTALLATION_BASE_DIR
   fi
   mkdir $INSTALLATION_BASE_DIR
@@ -56,17 +37,16 @@ configure_hbase()
   configure_HMaster
   configure_HRegionServer
 }
-start_()
+start_hbase()
 {
-  start_HMaster
-  start_HRegionServer
+  start_stop_HMaster "start"
+  start_stop_HRegionServer "start"
 }
-stop_()
+stop_hbase()
 {
-  stop_HMaster
-  stop_HRegionServer
+  start_stop_HMaster "stop"
+  start_stop_HRegionServer "stop"
 }
-
 extractModule()
 {
   module=$1
@@ -91,39 +71,24 @@ extractModule()
     mkdir $node_data_dir
   done
 }
-# file, key, value
-addXMLProperty()
-{
-  property_xml="\t<property>\n\t\t<name>$2</name>\n\t\t<value>$3</value>\n\t</property>\n</configuration>"
-  sed -i "s|</configuration>|$property_xml|" $1
-}
-# file, key, value
-addProperty()
-{
-  echo "export $2=$3" >> $1  
-}
+
 configure_HMaster()
 {
-println "Configure HMaster"
+echo "Configure HMaster"
 for (( i=1; i<=$NUMBER_OF_HMASTER; i++ ))
 do
     node_instance_dir=$INSTANCES/HMaster$i
     node_data_dir=$DATAS/HMasterData$i
     hbase_site_xml=$node_instance_dir/conf/hbase-site.xml
-    hbase_env=$node_instance_dir/conf/hbase-env.sh
+    hbase_env=$node_instance_dir/conf/hbase-env.sh    
     
-    addXMLProperty $hbase_site_xml "hbase.rootdir" "$HBASE_ROOTDIR" 
-	addXMLProperty $hbase_site_xml "hbase.zookeeper.quorum" "$HBASE_ZOOKEEPER_QUORUM" 
+	addXMLProperty $hbase_site_xml "hbase.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 2))"  
 	addXMLProperty $hbase_site_xml "hbase.cluster.distributed" "true" 
 	  
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
     addXMLProperty $hbase_site_xml "hbase.tmp.dir" "$tempDir"
-	
-	stagingDir=$node_data_dir/hbase-staging
-    mkdir $stagingDir
-    addXMLProperty $hbase_site_xml "hbase.fs.tmp.dir" "$stagingDir"
 	
 	master_port=$(($HMASTER_PORT_BASE + $i - 1))
 	addXMLProperty $hbase_site_xml "hbase.master.port" "$master_port"
@@ -149,26 +114,33 @@ done
 
 configure_HRegionServer()
 {
-println "Configure HRegionServer"
+echo "Configure HRegionServer"
 for (( i=1; i<=$NUMBER_OF_HREGION_SERVER; i++ ))
 do
     node_instance_dir=$INSTANCES/HRegionServer$i
     node_data_dir=$DATAS/HRegionServerData$i
     hbase_site_xml=$node_instance_dir/conf/hbase-site.xml
-    hbase_env=$node_instance_dir/conf/hbase-env.sh
+	hbase_env=$node_instance_dir/conf/hbase-env.sh
+	addXMLProperty $hbase_site_xml "hbase.rootdir" "hdfs://mycluster/hbase"	
+	
+	## hdfs cofig
+	hdfs_site_xml=$node_instance_dir/conf/hdfs-site.xml
+	echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration>\n</configuration>" > $hdfs_site_xml
+    addXMLProperty $hdfs_site_xml "dfs.ha.namenode.id" "nn"$i
+    name_node_rpc_port1=$(($NAMENODE_IPC_ADDRESS_BASE ))
+    name_node_rpc_port2=$(($NAMENODE_IPC_ADDRESS_BASE + 1))    
+    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn1" "$THIS_MACHINE_IP:$name_node_rpc_port1"
+    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn2" "$THIS_MACHINE_IP:$name_node_rpc_port2"  
+	#
     
-    addXMLProperty $hbase_site_xml "hbase.rootdir" "$HBASE_ROOTDIR" 
-	addXMLProperty $hbase_site_xml "hbase.zookeeper.quorum" "$HBASE_ZOOKEEPER_QUORUM" 
+     
+	addXMLProperty $hbase_site_xml "hbase.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 2))" 
 	addXMLProperty $hbase_site_xml "hbase.cluster.distributed" "true" 
 	  
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
     addXMLProperty $hbase_site_xml "hbase.tmp.dir" "$tempDir"
-	
-	stagingDir=$node_data_dir/hbase-staging
-    mkdir $stagingDir
-    addXMLProperty $hbase_site_xml "hbase.fs.tmp.dir" "$stagingDir"
 	
 	regionserver_port=$(($HREGION_SERVER_PORT_BASE + $i - 1))
 	addXMLProperty $hbase_site_xml "hbase.regionserver.port" "$regionserver_port"
@@ -192,12 +164,7 @@ do
 done
 }
 
-println()
-{
-    echo $1
-    echo ""
-}
-printports_()
+printports_hbase()
 {
 for (( i=1; i<=$NUMBER_OF_HMASTER; i++ ))
     do
@@ -220,74 +187,60 @@ for (( i=1; i<=$NUMBER_OF_HREGION_SERVER; i++ ))
     done
 }
 
-start_HMaster()
+start_stop_HMaster()
 {
   for (( i=1; i<=$NUMBER_OF_HMASTER; i++ ))
   do
-     node_instance_dir=$INSTANCES/HMaster$i  
-     $node_instance_dir/bin/hbase-daemon.sh start master
+     node_instance_dir=$INSTANCES/HMaster$i
+	 pushd $node_instance_dir/bin
+     ./hbase-daemon.sh $1 master
+	 popd
   done   
 }
-start_HRegionServer()
+start_stop_HRegionServer()
 {
   for (( i=1; i<=$NUMBER_OF_HREGION_SERVER; i++ ))
   do
      node_instance_dir=$INSTANCES/HRegionServer$i
-     $node_instance_dir/bin/hbase-daemon.sh start regionserver
+	 pushd $node_instance_dir/bin
+     ./hbase-daemon.sh $1 regionserver
+	 popd
   done   
 }
-
-stop_HMaster()
+restart_hbase()
 {
-  for (( i=1; i<=$NUMBER_OF_HMASTER; i++ ))
-  do
-     node_instance_dir=$INSTANCES/HMaster$i  
-     $node_instance_dir/bin/hbase-daemon.sh stop master
-  done
+  stop_hbase
+  start_hbase
 }
-stop_HRegionServer()
-{
-  for (( i=1; i<=$NUMBER_OF_HREGION_SERVER; i++ ))
-  do
-     node_instance_dir=$INSTANCES/HRegionServer$i
-     $node_instance_dir/bin/hbase-daemon.sh stop regionserver
-  done 
-}
-
-restart_()
-{
-  stop_
-  start_    
-}
-status_()
+status_hbase()
 {
   jps
 }
 case $1 in
   install)
-      install_
+      install_hbase
       ;;
   reinstall)
-      stop_
-      install_
-      start_
+      stop_hbase
+      install_hbase
+      start_hbase
       sleep 2
-      status_
+      status_hbase
       ;;
   start)
-      start_
+      start_hbase
       ;;
   stop)
-      stop_
+      stop_hbase
       ;;
   restart)
-      restart_
+      restart_hbase
       ;;
   status)
-      status_
+      status_hbase
       ;;
   printports)
-      printports_
+      printports_hbase
       ;;
   *)
   echo "Usage: $0 {install|start|stop|restart|status|printports}" >&2

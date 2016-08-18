@@ -46,8 +46,8 @@ configure_zookeeper()
     for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
     do
         server_id=$i
-        peer_port=$(($PEER_COM_PORT_BASE + $i - 1))
-        leader_elec_port=$(($LEADER_ELEC_PORT_BASE + $i - 1))
+        peer_port=$(($ZOOKEEPER_PEER_COM_PORT_BASE + $i - 1))
+        leader_elec_port=$(($ZOOKEEPER_LEADER_ELEC_PORT_BASE + $i - 1))
         dynamic_config_part="server.$server_id=$THIS_MACHINE_IP:$peer_port:$leader_elec_port:participant"
         echo "$dynamic_config_part" >> $dynamic_config_file
     done
@@ -90,11 +90,11 @@ configure_zookeeper()
         data_dir_location=$DATAS/data$i
         sed -i "s|dataDir=.*|dataDir=$data_dir_location|" $zoo_cfg_file    
         
-        client_port=$(($CLIENT_PORT_BASE + $i - 1))
+        client_port=$(($ZOOKEEPER_CLIENT_PORT_BASE + $i - 1))
         sed -i "s/clientPort=.*/clientPort=$client_port/" $zoo_cfg_file    
         
         if [ $SECURE = 'true' ]; then
-          secure_client_port=$(($CLIENT_SECURE_PORT_BASE + $i - 1))
+          secure_client_port=$(($ZOOKEEPER_CLIENT_SECURE_PORT_BASE + $i - 1))
           echo "secureClientPort=$secure_client_port" >> $zoo_cfg_file          
           #ssl configurations
           keystore_location=$zoo_instance_dir/conf/keystore
@@ -104,7 +104,7 @@ configure_zookeeper()
           echo "ssl.trustStore.password=mypass" >> $zoo_cfg_file      
         fi        
         
-        admin_port=$(($ADMIN_SERVER_PORT_BASE + $i - 1))
+        admin_port=$(($ZOOKEEPER_ADMIN_SERVER_PORT_BASE + $i - 1))
         echo "admin.serverPort=$admin_port" >> $zoo_cfg_file
 		dynamic_file_location=$zoo_instance_dir/conf/$dynamic_config_file
         if [ $BRANCH_3_4 = 'true' ]; then
@@ -140,11 +140,11 @@ configure_zookeeper()
           echo "export CLIENT_JVMFLAGS=\"\$CLIENT_JVMFLAGS -Djava.security.auth.login.config=$jaas_location -Djava.security.krb5.conf=$krb5_location -Dsun.security.krb5.debug=true -Dzookeeper.server.principal=zookeeper/hadoop.com\"" >> $env_file
         fi
 		
-        jmx_port=$(($JMX_PORT_BASE + $i - 1))
+        jmx_port=$(($ZOOKEEPER_JMX_PORT_BASE + $i - 1))
         echo "export JMXPORT=\"$jmx_port\"" >> $env_file  
            
         server_file=$zoo_instance_dir/bin/zkServer.sh
-        debug_port=$(($DEBUG_PORT_BASE + $i - 1))
+        debug_port=$(($ZOOKEEPER_DEBUG_PORT_BASE + $i - 1))
         debug_options="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port"
 		if [ $BRANCH_3_4 = 'true' ]; then
 			sed -i "s|nohup \"\$JAVA\"|nohup \"\$JAVA\" $debug_options|" $server_file
@@ -167,12 +167,12 @@ printports_zookeeper()
 for (( i=1; i<=$NUMBER_OF_INSTANCES; i++ ))
     do
         server_id=$i
-        peer_port=$(($PEER_COM_PORT_BASE + $i - 1))
-        leader_elec_port=$(($LEADER_ELEC_PORT_BASE + $i - 1))
-        client_port=$(($CLIENT_PORT_BASE + $i - 1))
-        secure_client_port=$(($CLIENT_SECURE_PORT_BASE + $i - 1))
-        admin_port=$(($ADMIN_SERVER_PORT_BASE + $i - 1))
-        jmx_port=$(($JMX_PORT_BASE + $i - 1))
+        peer_port=$(($ZOOKEEPER_PEER_COM_PORT_BASE + $i - 1))
+        leader_elec_port=$(($ZOOKEEPER_LEADER_ELEC_PORT_BASE + $i - 1))
+        client_port=$(($ZOOKEEPER_CLIENT_PORT_BASE + $i - 1))
+        secure_client_port=$(($ZOOKEEPER_CLIENT_SECURE_PORT_BASE + $i - 1))
+        admin_port=$(($ZOOKEEPER_ADMIN_SERVER_PORT_BASE + $i - 1))
+        jmx_port=$(($ZOOKEEPER_JMX_PORT_BASE + $i - 1))
         echo server.$server_id=$THIS_MACHINE_IP:$peer_port:$leader_elec_port:participant;
         echo "clientPort="$client_port
         echo "secureClientPort="$secure_client_port

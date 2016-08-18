@@ -4,7 +4,7 @@ BASE_DIR=`getBaseDir`
 
 INSTALLATION_BASE_DIR=$BASE_DIR/yarn
 RESOURCE_DIR=$BASE_DIR/resources
-HADOOP_RELEASE=$BASE_DIR/hadoop-2.7.2.tar.gz
+HADOOP_RELEASE=$BASE_DIR/hadoop-3.0.0-SNAPSHOT.tar.gz
 NUMBER_OF_RESOURCEMANAGER=1
 NUMBER_OF_NODEMANAGER=3
 
@@ -12,7 +12,7 @@ DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 THIS_MACHINE_IP=192.168.1.3
 # is the release from hadoop branch-2
-HADOOP2=true
+HADOOP2=false
 
 install_yarn()
 {
@@ -201,9 +201,13 @@ start_stop_resourcemanager()
   do
      node_instance_dir=$INSTANCES/resourceManager$i
      if [ $HADOOP2 = 'true' ]; then
-        $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop $action resourcemanager
+	    pushd $node_instance_dir/sbin
+        ./yarn-daemon.sh --config $node_instance_dir/etc/hadoop $action resourcemanager
+		popd
      else
-        $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon $action resourcemanager
+	    pushd $node_instance_dir/bin
+        ./yarn --config $node_instance_dir/etc/hadoop --daemon $action resourcemanager
+		popd
      fi
   done   
 }
@@ -214,9 +218,13 @@ start_stop_nodemanager()
   do
      node_instance_dir=$INSTANCES/nodeManager$i
      if [ $HADOOP2 = 'true' ]; then
-        $node_instance_dir/sbin/yarn-daemon.sh --config $node_instance_dir/etc/hadoop $action nodemanager
+	    pushd $node_instance_dir/sbin
+        ./yarn-daemon.sh --config $node_instance_dir/etc/hadoop $action nodemanager
+		popd
      else
-        $node_instance_dir/bin/yarn --config $node_instance_dir/etc/hadoop --daemon $action nodemanager
+	    pushd $node_instance_dir/bin
+        ./yarn --config $node_instance_dir/etc/hadoop --daemon $action nodemanager
+		popd
      fi 
   done   
 }

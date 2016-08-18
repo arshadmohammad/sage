@@ -4,7 +4,7 @@ BASE_DIR=`getBaseDir`
 
 INSTALLATION_BASE_DIR=$BASE_DIR/hadoop
 RESOURCE_DIR=$BASE_DIR/resources
-HADOOP_RELEASE=$BASE_DIR/hadoop-2.7.2.tar.gz
+HADOOP_RELEASE=$BASE_DIR/hadoop-3.0.0-SNAPSHOT.tar.gz
 NUMBER_OF_NAMENODE=2
 NUMBER_OF_DATANODE=3
 NUMBER_OF_JOURNALNODE=3
@@ -13,7 +13,7 @@ DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 THIS_MACHINE_IP=192.168.1.3
 # is the release from hadoop branch-2
-HADOOP2=true
+HADOOP2=false
 
 install_hadoop()
 {
@@ -104,7 +104,7 @@ do
 	
     
     addXMLProperty $hdfs_site_xml "dfs.namenode.shared.edits.dir" "qjournal://$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 1));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 2))/mycluster"
-    addXMLProperty $hdfs_site_xml "ha.zookeeper.quorum" "$THIS_MACHINE_IP:$(($CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($CLIENT_PORT_BASE + 2))"
+    addXMLProperty $hdfs_site_xml "ha.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 2))"
     zkfc_port=$(($ZKFC_PORT_BASE + $i - 1))
     addXMLProperty $hdfs_site_xml "dfs.ha.zkfc.port" "$zkfc_port"
     
@@ -307,15 +307,21 @@ start_stop_namenode()
         node_data_dir=$DATAS/nameNodeData$i
         #Formate name node only when directory current does not exist
         if [ ! -d $node_data_dir/name/current ]; then
-          $node_instance_dir/bin/hdfs namenode -bootstrapStandby -nonInteractive          
+		  pushd $node_instance_dir/bin/
+          ./hdfs namenode -bootstrapStandby -nonInteractive
+          popd		  
         fi
      fi
      if [ $HADOOP2 = 'true' ]; then
-        $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs $action zkfc
-        $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs $action namenode
+	    pushd $node_instance_dir/sbin
+        ./hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs $action zkfc
+        ./hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs $action namenode
+		popd
      else
-        $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon $action zkfc
-        $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon $action namenode
+	    pushd $node_instance_dir/bin
+        ./hdfs --config $node_instance_dir/etc/hadoop --daemon $action zkfc
+        ./hdfs --config $node_instance_dir/etc/hadoop --daemon $action namenode
+		popd
      fi
   done 
 }
@@ -326,9 +332,13 @@ start_stop_datanode()
   do
      node_instance_dir=$INSTANCES/dataNode$i
      if [ $HADOOP2 = 'true' ]; then
-        $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs $action datanode
+	    pushd $node_instance_dir/sbin/
+        ./hadoop-daemon.sh --config $node_instance_dir/etc/hadoop --script hdfs $action datanode
+		popd
      else
-        $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon $action datanode
+	    pushd $node_instance_dir/bin/
+        ./hdfs --config $node_instance_dir/etc/hadoop --daemon $action datanode
+		popd
      fi
   done 
 }
@@ -339,9 +349,13 @@ start_stop_journalnode()
   do
      node_instance_dir=$INSTANCES/journalNode$i
      if [ $HADOOP2 = 'true' ]; then
-        $node_instance_dir/sbin/hadoop-daemon.sh --config $node_instance_dir/etc/hadoop $action journalnode
+	    pushd $node_instance_dir/sbin/
+        ./hadoop-daemon.sh --config $node_instance_dir/etc/hadoop $action journalnode
+		popd
      else
-        $node_instance_dir/bin/hdfs --config $node_instance_dir/etc/hadoop --daemon $action journalnode
+	    pushd $node_instance_dir/bin/
+        ./hdfs --config $node_instance_dir/etc/hadoop --daemon $action journalnode
+		popd
      fi
   done   
 }
