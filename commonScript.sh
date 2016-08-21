@@ -59,3 +59,10 @@ addAllXMLProperty()
     addXMLProperty  $xmlFile $key $value
   done
 }
+createSiteFile()
+{
+site_xml=$1
+echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" > $site_xml
+echo "<configuration>" >> $site_xml
+echo "</configuration>" >> $site_xml
+}

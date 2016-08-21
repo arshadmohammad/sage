@@ -10,8 +10,6 @@ NUMBER_OF_HREGION_SERVER=3
 THIS_MACHINE_IP=192.168.1.3
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
-HBASE_ROOTDIR="hdfs://localhost:9000/hbase"
-HBASE_ZOOKEEPER_QUORUM="localhost:2181,localhost:2182,localhost:2183"
 
 install_hbase()
 {
@@ -51,7 +49,7 @@ extractModule()
 {
   module=$1
   count=$2
-  println "Extracting $module"
+  echo "Extracting $module"
   for (( i=1; i<=$count; i++ ))
   do
     #create module directory and extract release to this
@@ -80,7 +78,25 @@ do
     node_instance_dir=$INSTANCES/HMaster$i
     node_data_dir=$DATAS/HMasterData$i
     hbase_site_xml=$node_instance_dir/conf/hbase-site.xml
-    hbase_env=$node_instance_dir/conf/hbase-env.sh    
+    hbase_env=$node_instance_dir/conf/hbase-env.sh
+	addXMLProperty $hbase_site_xml "hbase.rootdir" "hdfs://mycluster/hbase"
+	
+	## hdfs cofig
+	core_site_xml=$node_instance_dir/conf/core-site.xml
+	createSiteFile $core_site_xml
+	addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://mycluster"
+	
+	hdfs_site_xml=$node_instance_dir/conf/hdfs-site.xml
+	createSiteFile $hdfs_site_xml
+	
+    addXMLProperty $hdfs_site_xml "dfs.nameservices" "mycluster"
+	addXMLProperty $hdfs_site_xml "dfs.ha.namenodes.mycluster" "nn1,nn2"
+    name_node_rpc_port1=$(($NAMENODE_IPC_ADDRESS_BASE ))
+    name_node_rpc_port2=$(($NAMENODE_IPC_ADDRESS_BASE + 1))    
+    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn1" "$THIS_MACHINE_IP:$name_node_rpc_port1"
+    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn2" "$THIS_MACHINE_IP:$name_node_rpc_port2"
+    addXMLProperty $hdfs_site_xml "dfs.client.failover.proxy.provider.mycluster" "org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider"	
+	#	
     
 	addXMLProperty $hbase_site_xml "hbase.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 2))"  
 	addXMLProperty $hbase_site_xml "hbase.cluster.distributed" "true" 
@@ -124,13 +140,20 @@ do
 	addXMLProperty $hbase_site_xml "hbase.rootdir" "hdfs://mycluster/hbase"	
 	
 	## hdfs cofig
+	core_site_xml=$node_instance_dir/conf/core-site.xml
+	createSiteFile $core_site_xml
+	addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://mycluster"
+	
 	hdfs_site_xml=$node_instance_dir/conf/hdfs-site.xml
-	echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration>\n</configuration>" > $hdfs_site_xml
-    addXMLProperty $hdfs_site_xml "dfs.ha.namenode.id" "nn"$i
+	createSiteFile $hdfs_site_xml
+	
+    addXMLProperty $hdfs_site_xml "dfs.nameservices" "mycluster"
+	addXMLProperty $hdfs_site_xml "dfs.ha.namenodes.mycluster" "nn1,nn2"
     name_node_rpc_port1=$(($NAMENODE_IPC_ADDRESS_BASE ))
     name_node_rpc_port2=$(($NAMENODE_IPC_ADDRESS_BASE + 1))    
     addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn1" "$THIS_MACHINE_IP:$name_node_rpc_port1"
-    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn2" "$THIS_MACHINE_IP:$name_node_rpc_port2"  
+    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn2" "$THIS_MACHINE_IP:$name_node_rpc_port2"
+    addXMLProperty $hdfs_site_xml "dfs.client.failover.proxy.provider.mycluster" "org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider"	
 	#
     
      
@@ -192,6 +215,7 @@ start_stop_HMaster()
   for (( i=1; i<=$NUMBER_OF_HMASTER; i++ ))
   do
      node_instance_dir=$INSTANCES/HMaster$i
+	 echo "$1 master"
 	 pushd $node_instance_dir/bin
      ./hbase-daemon.sh $1 master
 	 popd
