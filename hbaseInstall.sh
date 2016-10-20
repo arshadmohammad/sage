@@ -7,6 +7,8 @@ RESOURCE_DIR=$BASE_DIR/resources
 HBASE_RELEASE=$BASE_DIR/hbase-2.0.0-SNAPSHOT-bin.tar.gz
 NUMBER_OF_HMASTER=2
 NUMBER_OF_HREGION_SERVER=3
+NUMBER_OF_THRIFT_SERVER=3
+NUMBER_OF_REST_SERVER=1
 THIS_MACHINE_IP=192.168.1.3
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
@@ -17,7 +19,7 @@ install_hbase()
   
   if [ -d $INSTALLATION_BASE_DIR ]; then
 	stop_hbase
-	rm -r $INSTALLATION_BASE_DIR
+	#rm -r $INSTALLATION_BASE_DIR
   fi
   mkdir $INSTALLATION_BASE_DIR
   mkdir $DATAS
@@ -27,23 +29,31 @@ install_hbase()
 }
 extract_hbase()
 {
-  extractModule "HMaster" $NUMBER_OF_HMASTER
-  extractModule "HRegionServer" $NUMBER_OF_HREGION_SERVER
+  #extractModule "HMaster" $NUMBER_OF_HMASTER
+  #extractModule "HRegionServer" $NUMBER_OF_HREGION_SERVER
+  extractModule "ThriftServer" $NUMBER_OF_THRIFT_SERVER
+  extractModule "RestServer" $NUMBER_OF_REST_SERVER
 }
 configure_hbase()
 {
-  configure_HMaster
-  configure_HRegionServer
+  #configure_HMaster
+  #configure_HRegionServer
+  configure_ThriftServer
+  configure_RestServer
 }
 start_hbase()
 {
-  start_stop_HMaster "start"
-  start_stop_HRegionServer "start"
+  #start_stop_HMaster "start"
+  #start_stop_HRegionServer "start"
+  start_stop_ThriftServer "start"
+  start_stop_RestServer "start"
 }
 stop_hbase()
 {
-  start_stop_HMaster "stop"
-  start_stop_HRegionServer "stop"
+  #start_stop_HMaster "stop"
+  #start_stop_HRegionServer "stop"
+  start_stop_ThriftServer "stop"
+  start_stop_RestServer "stop"
 }
 extractModule()
 {
@@ -125,6 +135,9 @@ do
 	debug_port=$(($HMASTER_DEBUG_PORT_BASE + $i - 1))
     debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port \$HBASE_MASTER_OPTS"
 	addProperty $hbase_env "HBASE_MASTER_OPTS" "\"$debug_prop\""
+	
+	#Static configuration
+    addAllXMLProperty $hbase_site_xml "hbase.hmaster.properties"
 done
 }
 
@@ -184,6 +197,89 @@ do
 	debug_port=$(($HREGION_SERVER_DEBUG_PORT_BASE + $i - 1))
     debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port \$HBASE_REGIONSERVER_OPTS"
 	addProperty $hbase_env "HBASE_REGIONSERVER_OPTS" "\"$debug_prop\""
+	
+	#Static configuration
+    addAllXMLProperty $hbase_site_xml "hbase.hregion.properties"
+done
+}
+
+configure_ThriftServer()
+{
+echo "Configure ThriftServer"
+for (( i=1; i<=$NUMBER_OF_THRIFT_SERVER; i++ ))
+do
+    node_instance_dir=$INSTANCES/ThriftServer$i
+    node_data_dir=$DATAS/ThriftServerData$i
+    hbase_site_xml=$node_instance_dir/conf/hbase-site.xml
+	hbase_env=$node_instance_dir/conf/hbase-env.sh
+	 
+    
+    tempDir=$node_data_dir/temp
+    mkdir $tempDir
+    addXMLProperty $hbase_site_xml "hbase.tmp.dir" "$tempDir"
+	
+	thriftserver_port=$(($THRIFT_SERVER_PORT_BASE + $i - 1))
+	addXMLProperty $hbase_site_xml "hbase.regionserver.thrift.port" "$thriftserver_port"
+	
+	thriftserver_ui_port=$(($THRIFT_SERVER_INFO_PORT_BASE + $i - 1))
+	addXMLProperty $hbase_site_xml "hbase.thrift.info.port" "$thriftserver_ui_port" 
+	
+	
+    #Env configuration
+    pidDir=$node_data_dir/pid
+    mkdir $pidDir
+    addProperty $hbase_env "HBASE_PID_DIR" "$pidDir"
+    
+    jmx_port=$(($THRIFT_SERVER_JMX_PORT_BASE + $i - 1))
+    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false \$HBASE_THRIFT_OPTS"
+    addProperty $hbase_env "HBASE_THRIFT_OPTS" "\"$jmx_prop\""
+	
+	debug_port=$(($THRIFT_SERVER_DEBUG_PORT_BASE + $i - 1))
+    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port \$HBASE_THRIFT_OPTS"
+	addProperty $hbase_env "HBASE_THRIFT_OPTS" "\"$debug_prop\""
+	
+	#Static configuration
+    addAllXMLProperty $hbase_site_xml "hbase.thrift.properties"
+done
+}
+
+configure_RestServer()
+{
+echo "Configure RestServer"
+for (( i=1; i<=$NUMBER_OF_REST_SERVER; i++ ))
+do
+    node_instance_dir=$INSTANCES/RestServer$i
+    node_data_dir=$DATAS/RestServerData$i
+    hbase_site_xml=$node_instance_dir/conf/hbase-site.xml
+	hbase_env=$node_instance_dir/conf/hbase-env.sh
+	 
+    
+    tempDir=$node_data_dir/temp
+    mkdir $tempDir
+    addXMLProperty $hbase_site_xml "hbase.tmp.dir" "$tempDir"
+	
+	restserver_port=$(($REST_SERVER_PORT_BASE + $i - 1))
+	addXMLProperty $hbase_site_xml "hbase.rest.port" "$restserver_port"
+	
+	restserver_ui_port=$(($REST_SERVER_INFO_PORT_BASE + $i - 1))
+	addXMLProperty $hbase_site_xml "hbase.rest.info.port" "$restserver_ui_port" 
+	
+	
+    #Env configuration
+    pidDir=$node_data_dir/pid
+    mkdir $pidDir
+    addProperty $hbase_env "HBASE_PID_DIR" "$pidDir"
+    
+    jmx_port=$(($REST_SERVER_JMX_PORT_BASE + $i - 1))
+    jmx_prop="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$jmx_port -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false \$HBASE_REST_OPTS"
+    addProperty $hbase_env "HBASE_REST_OPTS" "\"$jmx_prop\""
+	
+	debug_port=$(($REST_SERVER_DEBUG_PORT_BASE + $i - 1))
+    debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port \$HBASE_REST_OPTS"
+	addProperty $hbase_env "HBASE_REST_OPTS" "\"$debug_prop\""
+	
+	#Static configuration
+    addAllXMLProperty $hbase_site_xml "hbase.rest.properties"
 done
 }
 
@@ -228,6 +324,26 @@ start_stop_HRegionServer()
      node_instance_dir=$INSTANCES/HRegionServer$i
 	 pushd $node_instance_dir/bin
      ./hbase-daemon.sh $1 regionserver
+	 popd
+  done   
+}
+start_stop_ThriftServer()
+{
+  for (( i=1; i<=$NUMBER_OF_THRIFT_SERVER; i++ ))
+  do
+     node_instance_dir=$INSTANCES/ThriftServer$i
+	 pushd $node_instance_dir/bin
+     ./hbase-daemon.sh $1 thrift2
+	 popd
+  done   
+}
+start_stop_RestServer()
+{
+  for (( i=1; i<=$NUMBER_OF_THRIFT_SERVER; i++ ))
+  do
+     node_instance_dir=$INSTANCES/RestServer$i
+	 pushd $node_instance_dir/bin
+     ./hbase-daemon.sh $1 rest
 	 popd
   done   
 }
