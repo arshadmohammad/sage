@@ -4,16 +4,15 @@ BASE_DIR=`getBaseDir`
 
 INSTALLATION_BASE_DIR=$BASE_DIR/hadoop
 RESOURCE_DIR=$BASE_DIR/resources
-HADOOP_RELEASE=$BASE_DIR/hadoop-3.0.0-SNAPSHOT.tar.gz
+HADOOP_RELEASE=$BASE_DIR/hadoop-2.7.3.tar.gz
 NUMBER_OF_NAMENODE=2
 NUMBER_OF_DATANODE=3
 NUMBER_OF_JOURNALNODE=3
 
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
-THIS_MACHINE_IP=192.168.1.3
 # is the release from hadoop branch-2
-HADOOP2=false
+HADOOP2=true
 
 install_hadoop()
 {
@@ -88,20 +87,14 @@ do
     hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
     hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
     
-	## common cofig for all config
-    addXMLProperty $hdfs_site_xml "dfs.ha.namenode.id" "nn"$i
-    name_node_rpc_port1=$(($NAMENODE_IPC_ADDRESS_BASE ))
-    name_node_rpc_port2=$(($NAMENODE_IPC_ADDRESS_BASE + 1))   
-    
-    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn1" "$THIS_MACHINE_IP:$name_node_rpc_port1"
-    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn2" "$THIS_MACHINE_IP:$name_node_rpc_port2"
+	##common cofig for all config
+    addXMLProperty $hdfs_site_xml "dfs.ha.namenode.id" "nn"$i    
     
     http_port1=$(($NAMENODE_HTTP_ADDRESS_BASE))
     http_port2=$(($NAMENODE_HTTP_ADDRESS_BASE + 1))
     addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn1" "0.0.0.0:$http_port1"
     addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn2" "0.0.0.0:$http_port2"
-	#
-	
+		
     
     addXMLProperty $hdfs_site_xml "dfs.namenode.shared.edits.dir" "qjournal://$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 1));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 2))/mycluster"
     addXMLProperty $hdfs_site_xml "ha.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 2))"
@@ -148,21 +141,12 @@ do
     node_data_dir=$DATAS/dataNodeData$i
     core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
     hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
-    hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh
-	
-	## common cofig for all config
-    addXMLProperty $hdfs_site_xml "dfs.ha.namenode.id" "nn"$i
-    name_node_rpc_port1=$(($NAMENODE_IPC_ADDRESS_BASE ))
-    name_node_rpc_port2=$(($NAMENODE_IPC_ADDRESS_BASE + 1))   
-    
-    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn1" "$THIS_MACHINE_IP:$name_node_rpc_port1"
-    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn2" "$THIS_MACHINE_IP:$name_node_rpc_port2"
-    
+    hadoop_env=$node_instance_dir/etc/hadoop/hadoop-env.sh	
+        
     http_port1=$(($NAMENODE_HTTP_ADDRESS_BASE))
     http_port2=$(($NAMENODE_HTTP_ADDRESS_BASE + 1))
     addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn1" "0.0.0.0:$http_port1"
     addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn2" "0.0.0.0:$http_port2"
-	#
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir

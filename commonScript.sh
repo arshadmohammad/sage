@@ -28,7 +28,7 @@ addAllProperty()
 		  echo "line $line is commented"
 		  continue
 		fi
-		line2=$( echo $line | sed "s|\${INSTALLATON_HOME}|$BASE_DIR|")
+		line2=$( echo $line | sed "s|\$INSTALLATION_HOME|$INSTALLATION_HOME|")
 		echo $line2 >> $to
 	done
 }
@@ -53,9 +53,10 @@ addAllXMLProperty()
 	  echo "line $line is commented"
 	  continue
 	fi
-	line2=$( echo $line | sed "s|\${INSTALLATON_HOME}|$BASE_DIR|" )
-    key=$(echo $line2| cut -d "=" -f1)
-    value=$(echo $line2| cut -d "=" -f2 | tr -d '\r' | tr -d '\n')
+	line2=$( echo $line | sed "s|\$INSTALLATION_HOME|$INSTALLATION_HOME|" )
+	line3=$( echo $line2 | sed "s|\$THIS_MACHINE_IP|$THIS_MACHINE_IP|" )
+    key=$(echo $line3| cut -d "=" -f1)
+    value=$(echo $line3| cut -d "=" -f2 | tr -d '\r' | tr -d '\n')
     addXMLProperty  $xmlFile $key $value
   done
 }

@@ -4,12 +4,11 @@ BASE_DIR=`getBaseDir`
 
 INSTALLATION_BASE_DIR=$BASE_DIR/hbase
 RESOURCE_DIR=$BASE_DIR/resources
-HBASE_RELEASE=$BASE_DIR/hbase-2.0.0-SNAPSHOT-bin.tar.gz
+HBASE_RELEASE=$BASE_DIR/hbase-1.2.3-bin.tar.gz
 NUMBER_OF_HMASTER=2
 NUMBER_OF_HREGION_SERVER=3
-NUMBER_OF_THRIFT_SERVER=3
+NUMBER_OF_THRIFT_SERVER=1
 NUMBER_OF_REST_SERVER=1
-THIS_MACHINE_IP=192.168.1.3
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 
@@ -19,7 +18,7 @@ install_hbase()
   
   if [ -d $INSTALLATION_BASE_DIR ]; then
 	stop_hbase
-	#rm -r $INSTALLATION_BASE_DIR
+	rm -r $INSTALLATION_BASE_DIR
   fi
   mkdir $INSTALLATION_BASE_DIR
   mkdir $DATAS
@@ -29,29 +28,29 @@ install_hbase()
 }
 extract_hbase()
 {
-  #extractModule "HMaster" $NUMBER_OF_HMASTER
-  #extractModule "HRegionServer" $NUMBER_OF_HREGION_SERVER
+  extractModule "HMaster" $NUMBER_OF_HMASTER
+  extractModule "HRegionServer" $NUMBER_OF_HREGION_SERVER
   extractModule "ThriftServer" $NUMBER_OF_THRIFT_SERVER
   extractModule "RestServer" $NUMBER_OF_REST_SERVER
 }
 configure_hbase()
 {
-  #configure_HMaster
-  #configure_HRegionServer
+  configure_HMaster
+  configure_HRegionServer
   configure_ThriftServer
   configure_RestServer
 }
 start_hbase()
 {
-  #start_stop_HMaster "start"
-  #start_stop_HRegionServer "start"
+  start_stop_HMaster "start"
+  start_stop_HRegionServer "start"
   start_stop_ThriftServer "start"
   start_stop_RestServer "start"
 }
 stop_hbase()
 {
-  #start_stop_HMaster "stop"
-  #start_stop_HRegionServer "stop"
+  start_stop_HMaster "stop"
+  start_stop_HRegionServer "stop"
   start_stop_ThriftServer "stop"
   start_stop_RestServer "stop"
 }
@@ -94,24 +93,14 @@ do
 	## hdfs cofig
 	core_site_xml=$node_instance_dir/conf/core-site.xml
 	createSiteFile $core_site_xml
-	addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://mycluster"
+	addAllXMLProperty $core_site_xml "hbase.core.properties"	
 	
 	hdfs_site_xml=$node_instance_dir/conf/hdfs-site.xml
 	createSiteFile $hdfs_site_xml
-	
-    addXMLProperty $hdfs_site_xml "dfs.nameservices" "mycluster"
-	addXMLProperty $hdfs_site_xml "dfs.ha.namenodes.mycluster" "nn1,nn2"
-    name_node_rpc_port1=$(($NAMENODE_IPC_ADDRESS_BASE ))
-    name_node_rpc_port2=$(($NAMENODE_IPC_ADDRESS_BASE + 1))    
-    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn1" "$THIS_MACHINE_IP:$name_node_rpc_port1"
-    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn2" "$THIS_MACHINE_IP:$name_node_rpc_port2"
-    addXMLProperty $hdfs_site_xml "dfs.client.failover.proxy.provider.mycluster" "org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider"	
-	#	
+	addAllXMLProperty $core_site_xml "hbase.hdfs.properties"    
     
 	addXMLProperty $hbase_site_xml "hbase.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 2))"  
-	addXMLProperty $hbase_site_xml "hbase.cluster.distributed" "true" 
-	  
-    
+	 
     tempDir=$node_data_dir/temp
     mkdir $tempDir
     addXMLProperty $hbase_site_xml "hbase.tmp.dir" "$tempDir"
@@ -135,6 +124,7 @@ do
 	debug_port=$(($HMASTER_DEBUG_PORT_BASE + $i - 1))
     debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port \$HBASE_MASTER_OPTS"
 	addProperty $hbase_env "HBASE_MASTER_OPTS" "\"$debug_prop\""
+	#addProperty $hbase_env "HBASE_MASTER_OPTS" "\"-Djava.security.auth.login.config=/home/sage/resources/hbase/zk-jaas.conf\""
 	
 	#Static configuration
     addAllXMLProperty $hbase_site_xml "hbase.hmaster.properties"
@@ -155,24 +145,14 @@ do
 	## hdfs cofig
 	core_site_xml=$node_instance_dir/conf/core-site.xml
 	createSiteFile $core_site_xml
-	addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://mycluster"
+	addAllXMLProperty $core_site_xml "hbase.core.properties"
 	
 	hdfs_site_xml=$node_instance_dir/conf/hdfs-site.xml
 	createSiteFile $hdfs_site_xml
-	
-    addXMLProperty $hdfs_site_xml "dfs.nameservices" "mycluster"
-	addXMLProperty $hdfs_site_xml "dfs.ha.namenodes.mycluster" "nn1,nn2"
-    name_node_rpc_port1=$(($NAMENODE_IPC_ADDRESS_BASE ))
-    name_node_rpc_port2=$(($NAMENODE_IPC_ADDRESS_BASE + 1))    
-    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn1" "$THIS_MACHINE_IP:$name_node_rpc_port1"
-    addXMLProperty $hdfs_site_xml "dfs.namenode.rpc-address.mycluster.nn2" "$THIS_MACHINE_IP:$name_node_rpc_port2"
-    addXMLProperty $hdfs_site_xml "dfs.client.failover.proxy.provider.mycluster" "org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider"	
-	#
-    
+	addAllXMLProperty $core_site_xml "hbase.hdfs.properties"       
      
 	addXMLProperty $hbase_site_xml "hbase.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 2))" 
-	addXMLProperty $hbase_site_xml "hbase.cluster.distributed" "true" 
-	  
+		  
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
@@ -197,7 +177,7 @@ do
 	debug_port=$(($HREGION_SERVER_DEBUG_PORT_BASE + $i - 1))
     debug_prop="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=$debug_port \$HBASE_REGIONSERVER_OPTS"
 	addProperty $hbase_env "HBASE_REGIONSERVER_OPTS" "\"$debug_prop\""
-	
+		
 	#Static configuration
     addAllXMLProperty $hbase_site_xml "hbase.hregion.properties"
 done

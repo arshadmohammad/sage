@@ -1,14 +1,14 @@
-nn/hadoop.com nn
-sn/hadoop.com sn
-dn/hadoop.com dn
-rm/hadoop.com rm
-nm/hadoop.com nm
-jhs/hadoop.com jhs
+nn/192.168.1.3 nn
+sn/192.168.1.3 sn
+jn/192.168.1.3 jn
+dn/192.168.1.3 dn
+jhs/192.168.1.3 jhs
+nm/192.168.1.3 nm
+rm/192.168.1.3 rm
+hdfs/192.168.1.3 hdfs
+hbase/192.168.1.3 hbase
 zookeeper/192.168.1.3 zookeeper
-zookeeper/hadoop.com zookeeper
-zookeeper2/hadoop.com zookeeper2
-zookeeper3/hadoop.com zookeeper3
 zkcli zkcli
-zkcli/hadoop.com zkcli
-zkcli2/hadoop.com zkcli3
-zkcli3/hadoop.com zkcli3
+HTTP/192.168.1.3 HTTP
+HTTPS/192.168.1.3 HTTPS
+

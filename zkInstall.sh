@@ -3,12 +3,12 @@ source commonScript.sh
 BASE_DIR=`getBaseDir`
 INSTALLATION_BASE_DIR=$BASE_DIR/zk
 RESOURCE_DIR=$BASE_DIR/resources
-ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.6.0-SNAPSHOT.tar.gz
+ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.6.0-SNAPSHOT_TraceLog.tar.gz
 NUMBER_OF_INSTANCES=3
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 AUTHENTION=true
-SECURE=false
+SECURE=true
 THIS_MACHINE_IP=192.168.1.3
 BRANCH_3_4=false
 install_zookeeper()
@@ -130,7 +130,8 @@ configure_zookeeper()
 		fi
         sed -i "s/ZOO_LOG4J_PROP=.*/ZOO_LOG4J_PROP=\"INFO,ROLLINGFILE\"/" $env_file
 		log4j_file=$zoo_instance_dir/conf/log4j.properties
-		sed -i "s|INFO|DEBUG|" $log4j_file
+		#sed -i "s|INFO|DEBUG|" $log4j_file
+		#echo "log4j.logger.org.apache.zookeeper.server.ZooTrace=TRACE, TRACEFILE" >> $log4j_file
         
         if [ $AUTHENTION = 'true' ]; then
           jaas_location=$zoo_instance_dir/conf/jaas.conf
@@ -141,7 +142,8 @@ configure_zookeeper()
         fi
 		
         jmx_port=$(($ZOOKEEPER_JMX_PORT_BASE + $i - 1))
-        echo "export JMXPORT=\"$jmx_port\"" >> $env_file  
+        echo "export JMXPORT=\"$jmx_port\"" >> $env_file
+		echo "export ZKMACHINE=\"$THIS_MACHINE_IP\"" >> $env_file
            
         server_file=$zoo_instance_dir/bin/zkServer.sh
         debug_port=$(($ZOOKEEPER_DEBUG_PORT_BASE + $i - 1))
