@@ -207,6 +207,10 @@ do
 
     http_port=$(($JOURNALNODE_HTTP_ADDRESS_BASE + $i - 1))
     addXMLProperty $hdfs_site_xml "dfs.journalnode.http-address" "0.0.0.0:$http_port"
+	
+	    #Static configuration
+    addAllXMLProperty $core_site_xml "core.properties"
+    addAllXMLProperty $hdfs_site_xml "hdfs.properties"
 
     
     #Env configuration
