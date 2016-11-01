@@ -1,14 +1,14 @@
-nn/192.168.1.3 nn
-sn/192.168.1.3 sn
-jn/192.168.1.3 jn
-dn/192.168.1.3 dn
-jhs/192.168.1.3 jhs
-nm/192.168.1.3 nm
-rm/192.168.1.3 rm
-hdfs/192.168.1.3 hdfs
-hbase/192.168.1.3 hbase
+nn/voltan nn
+sn/voltan sn
+jn/voltan jn
+dn/voltan dn
+jhs/voltan jhs
+nm/voltan nm
+rm/voltan rm
+hdfs/voltan hdfs
+hbase/voltan hbase
+zookeeper/voltan zookeeper
 zookeeper/192.168.1.3 zookeeper
 zkcli zkcli
-HTTP/192.168.1.3 HTTP
-HTTPS/192.168.1.3 HTTPS
-
+HTTP/voltan HTTP
+HTTPS/voltan HTTPS

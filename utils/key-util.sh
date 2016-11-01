@@ -1,0 +1,1 @@
+keytool -genkeypair -alias mykey -keyalg RSA -keystore keystore -keysize 2048 -dname "CN=voltan,OU=Hadoop,O=MyCom,L=Bangalore,ST=Karntaka,C=India" -storepass mypass -keypass keypass

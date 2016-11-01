@@ -49,7 +49,8 @@ start_hadoop()
 stop_hadoop()
 {
   start_stop_datanode stop
-  start_stop_namenode stop 
+  #prestineNameNode
+  start_stop_namenode stop   
   start_stop_journalnode stop
 }
 extractModule()
@@ -76,10 +77,34 @@ extractModule()
     mkdir $node_data_dir
   done
 }
+prestineNameNode()
+{
+#create data dir
+module="nameNode"
+data="Data2"
+node_data_dir=$DATAS/$module$data
+if [ -d $node_data_dir ]; then
+  rm -r $node_data_dir
+fi 
+mkdir $node_data_dir
+
+tempDir=$node_data_dir/temp
+mkdir $tempDir
+
+nameDir=$node_data_dir/name
+mkdir $nameDir
+
+editDir=$node_data_dir/edit
+mkdir $editDir
+
+pidDir=$node_data_dir/pid
+mkdir $pidDir
+
+}
 configure_namenode()
 {
 echo "Configure name node"
-for (( i=1; i<=2; i++ ))
+for (( i=1; i<=NUMBER_OF_NAMENODE; i++ ))
 do
     node_instance_dir=$INSTANCES/nameNode$i
     node_data_dir=$DATAS/nameNodeData$i
@@ -94,6 +119,11 @@ do
     http_port2=$(($NAMENODE_HTTP_ADDRESS_BASE + 1))
     addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn1" "0.0.0.0:$http_port1"
     addXMLProperty $hdfs_site_xml "dfs.namenode.http-address.mycluster.nn2" "0.0.0.0:$http_port2"
+	
+	 https_port1=$(($NAMENODE_HTTPS_ADDRESS_BASE))
+    https_port2=$(($NAMENODE_HTTPS_ADDRESS_BASE + 1))
+	addXMLProperty $hdfs_site_xml "dfs.namenode.https-address.mycluster.nn1" "0.0.0.0:$https_port1"
+    addXMLProperty $hdfs_site_xml "dfs.namenode.https-address.mycluster.nn2" "0.0.0.0:$https_port2"
 		
     
     addXMLProperty $hdfs_site_xml "dfs.namenode.shared.edits.dir" "qjournal://$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 1));$THIS_MACHINE_IP:$(($JOURNALNODE_IPC_ADDRESS_BASE + 2))/mycluster"
@@ -116,6 +146,8 @@ do
     #Static configuration
     addAllXMLProperty $core_site_xml "core.properties"
     addAllXMLProperty $hdfs_site_xml "hdfs.properties"
+	cp $INSTALLATION_HOME/resources/hadoop/ssl-server.xml $node_instance_dir/etc/hadoop/
+	cp $INSTALLATION_HOME/resources/hadoop/ssl-client.xml $node_instance_dir/etc/hadoop/
     
     #Env configuration
     pidDir=$node_data_dir/pid
@@ -158,6 +190,9 @@ do
 
     http_port=$(($DATANODE_HTTP_ADDRESS_BASE + $i - 1))
     addXMLProperty $hdfs_site_xml "dfs.datanode.http.address" "0.0.0.0:$http_port"
+	
+	https_port=$(($DATANODE_HTTPS_ADDRESS_BASE + $i - 1))
+    addXMLProperty $hdfs_site_xml "dfs.datanode.https.address" "0.0.0.0:$https_port"
 
     data_node_port=$(($DATANODE_ADDRESS_BASE + $i - 1))
     addXMLProperty $hdfs_site_xml "dfs.datanode.address" "0.0.0.0:$data_node_port"    
@@ -168,6 +203,8 @@ do
     #Static configuration
     addAllXMLProperty $core_site_xml "core.properties"
     addAllXMLProperty $hdfs_site_xml "hdfs.properties"
+	cp $INSTALLATION_HOME/resources/hadoop/ssl-server.xml $node_instance_dir/etc/hadoop/
+	cp $INSTALLATION_HOME/resources/hadoop/ssl-client.xml $node_instance_dir/etc/hadoop/
     
     #Env configuration
     pidDir=$node_data_dir/pid
@@ -208,9 +245,14 @@ do
     http_port=$(($JOURNALNODE_HTTP_ADDRESS_BASE + $i - 1))
     addXMLProperty $hdfs_site_xml "dfs.journalnode.http-address" "0.0.0.0:$http_port"
 	
+	https_port=$(($JOURNALNODE_HTTPS_ADDRESS_BASE + $i - 1))
+    addXMLProperty $hdfs_site_xml "dfs.journalnode.https-address" "0.0.0.0:$https_port"
+	
 	    #Static configuration
     addAllXMLProperty $core_site_xml "core.properties"
     addAllXMLProperty $hdfs_site_xml "hdfs.properties"
+	cp $INSTALLATION_HOME/resources/hadoop/ssl-server.xml $node_instance_dir/etc/hadoop/
+	cp $INSTALLATION_HOME/resources/hadoop/ssl-client.xml $node_instance_dir/etc/hadoop/
 
     
     #Env configuration
@@ -296,6 +338,7 @@ start_stop_namenode()
         #Formate name node only when directory current does not exist
         if [ ! -d $node_data_dir/name/current ]; then
 		  pushd $node_instance_dir/bin/
+		  echo "./hdfs namenode -bootstrapStandby -nonInteractive"
           ./hdfs namenode -bootstrapStandby -nonInteractive
           popd		  
         fi

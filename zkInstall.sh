@@ -3,7 +3,7 @@ source commonScript.sh
 BASE_DIR=`getBaseDir`
 INSTALLATION_BASE_DIR=$BASE_DIR/zk
 RESOURCE_DIR=$BASE_DIR/resources
-ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.6.0-SNAPSHOT_TraceLog.tar.gz
+ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.6.0-SNAPSHOT.tar.gz
 NUMBER_OF_INSTANCES=3
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
@@ -26,7 +26,9 @@ install_zookeeper()
     do
         zoo_instance_dir=$INSTANCES/zookeeper$i
         mkdir $zoo_instance_dir
-        tar -mxf $ZOOKEEPER_RELEASE -C $zoo_instance_dir --strip-components 1 
+        tar -mxf $ZOOKEEPER_RELEASE -C $zoo_instance_dir --strip-components 1
+		dos2unix $zoo_instance_dir/bin/*
+		dos2unix $zoo_instance_dir/conf
         
         zoo_data_dir=$DATAS/data$i
         mkdir $zoo_data_dir
