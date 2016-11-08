@@ -97,7 +97,7 @@ do
 	
 	hdfs_site_xml=$node_instance_dir/conf/hdfs-site.xml
 	createSiteFile $hdfs_site_xml
-	addAllXMLProperty $core_site_xml "hbase.hdfs.properties"    
+	addAllXMLProperty $hdfs_site_xml "hbase.hdfs.properties"    
     
 	addXMLProperty $hbase_site_xml "hbase.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 2))"  
 	 

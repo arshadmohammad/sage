@@ -65,7 +65,7 @@
 
 <property>
   <name>ssl.client.keystore.keypassword</name>
-  <value></value>
+  <value>keypass</value>
   <description>Optional. Default value is "".
   </description>
 </property>
