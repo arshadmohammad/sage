@@ -128,6 +128,8 @@ do
 	
 	#Static configuration
     addAllXMLProperty $hbase_site_xml "hbase.hmaster.properties"
+	cp $INSTALLATION_HOME/resources/hadoop/ssl-server.xml $node_instance_dir/conf/
+	cp $INSTALLATION_HOME/resources/hadoop/ssl-client.xml $node_instance_dir/conf/
 done
 }
 
@@ -180,6 +182,8 @@ do
 		
 	#Static configuration
     addAllXMLProperty $hbase_site_xml "hbase.hregion.properties"
+	cp $INSTALLATION_HOME/resources/hadoop/ssl-server.xml $node_instance_dir/conf/
+	cp $INSTALLATION_HOME/resources/hadoop/ssl-client.xml $node_instance_dir/conf/
 done
 }
 
