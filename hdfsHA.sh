@@ -4,7 +4,7 @@ BASE_DIR=`getBaseDir`
 
 INSTALLATION_BASE_DIR=$BASE_DIR/hadoop
 RESOURCE_DIR=$BASE_DIR/resources
-HADOOP_RELEASE=$BASE_DIR/hadoop-2.7.3.tar.gz
+HADOOP_RELEASE=$BASE_DIR/hadoop-3.0.0-alpha1.tar.gz
 NUMBER_OF_NAMENODE=2
 NUMBER_OF_DATANODE=3
 NUMBER_OF_JOURNALNODE=3
@@ -12,7 +12,7 @@ NUMBER_OF_JOURNALNODE=3
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 # is the release from hadoop branch-2
-HADOOP2=true
+HADOOP2=false
 
 install_hadoop()
 {
@@ -66,8 +66,14 @@ extractModule()
       rm -r $node_instance_dir
     fi    
     mkdir $node_instance_dir
-    tar -mxf $HADOOP_RELEASE -C $node_instance_dir --strip-components 1 
-    
+    tar -mxf $HADOOP_RELEASE -C $node_instance_dir --strip-components 1
+	if [ $WINDOWS_BUILD = 'true' ]; then
+	  dos2unix $node_instance_dir/bin/*
+	  dos2unix $node_instance_dir/sbin/*
+	  dos2unix $node_instance_dir/etc/hadoop/*
+	  dos2unix $node_instance_dir/libexec/*
+	fi
+	    
     #create data dir
     data="Data"
     node_data_dir=$DATAS/$module$data$i
@@ -390,6 +396,28 @@ start_stop_journalnode()
      fi
   done   
 }
+inithbase()
+{
+echo "Initializting HBase directory"
+node_instance_dir=$INSTANCES/nameNode1
+kdestroy
+kinit -k -t $INSTALLATION_HOME/resources/common/hadoop.keytab hdfs/volton
+klist
+cd $node_instance_dir/bin
+./hdfs dfs -mkdir /hbase
+./hdfs dfs -chown hbase:hadoop /hbase
+./hdfs dfs -chmod 755 /hbase
+kdestroy
+echo "HBase hdfs directory initialized."
+}
+init()
+{
+klist
+kdestroy
+kinit -k -t $INSTALLATION_HOME/resources/common/hadoop.keytab $1
+klist
+cd $node_instance_dir/bin
+}
 tests_hadoop()
 {
   for (( i=1; i<=2; i++ ))
@@ -439,6 +467,12 @@ case $1 in
       ;;
   tests)
       tests_hadoop
+      ;;
+  inithbase)
+      inithbase
+      ;;
+  init)
+      init $2
       ;;
   *)
   echo "Usage: $0 {install|start|stop|restart|status|printports}" >&2

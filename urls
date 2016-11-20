@@ -1,0 +1,22 @@
+Name Node:
+https://volton:50470/dfshealth.html
+https://volton:50471/dfshealth.html
+
+Journal Node:
+https://volton:8491/index.html
+https://volton:8492/index.html
+https://volton:8493/index.html
+
+DataNode:
+https://volton:50475/index.html
+https://volton:50476/index.html
+https://volton:50477/index.html
+
+HMaser:
+https://volton:16010/master-status
+https://volton:16011/master-status
+
+HRegionServer
+https://volton:16030/rs-status
+https://volton:16031/rs-status
+https://volton:16032/rs-status

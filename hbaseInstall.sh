@@ -4,7 +4,7 @@ BASE_DIR=`getBaseDir`
 
 INSTALLATION_BASE_DIR=$BASE_DIR/hbase
 RESOURCE_DIR=$BASE_DIR/resources
-HBASE_RELEASE=$BASE_DIR/hbase-1.2.3-bin.tar.gz
+HBASE_RELEASE=$BASE_DIR/hbase-2.0.0-SNAPSHOT-bin.tar.gz
 NUMBER_OF_HMASTER=2
 NUMBER_OF_HREGION_SERVER=3
 NUMBER_OF_THRIFT_SERVER=1
@@ -67,7 +67,13 @@ extractModule()
       rm -r $node_instance_dir
     fi    
     mkdir $node_instance_dir
-    tar -mxf $HBASE_RELEASE -C $node_instance_dir --strip-components 1 
+    tar -mxf $HBASE_RELEASE -C $node_instance_dir --strip-components 1
+	if [ $WINDOWS_BUILD = 'true' ]; then
+	  dos2unix $node_instance_dir/bin/*
+	  dos2unix $node_instance_dir/bin/replication/*
+	  dos2unix $node_instance_dir/bin/test/*
+	  dos2unix $node_instance_dir/conf/*
+	fi
     
     #create data dir
     data="Data"
@@ -151,7 +157,7 @@ do
 	
 	hdfs_site_xml=$node_instance_dir/conf/hdfs-site.xml
 	createSiteFile $hdfs_site_xml
-	addAllXMLProperty $core_site_xml "hbase.hdfs.properties"       
+	addAllXMLProperty $hdfs_site_xml "hbase.hdfs.properties"       
      
 	addXMLProperty $hbase_site_xml "hbase.zookeeper.quorum" "$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 1)),$THIS_MACHINE_IP:$(($ZOOKEEPER_CLIENT_PORT_BASE + 2))" 
 		  
@@ -297,7 +303,7 @@ start_stop_HMaster()
      node_instance_dir=$INSTANCES/HMaster$i
 	 echo "$1 master"
 	 pushd $node_instance_dir/bin
-     ./hbase-daemon.sh $1 master
+     ./hbase-daemon.sh --config $node_instance_dir/conf $1 master
 	 popd
   done   
 }

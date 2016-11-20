@@ -27,8 +27,10 @@ install_zookeeper()
         zoo_instance_dir=$INSTANCES/zookeeper$i
         mkdir $zoo_instance_dir
         tar -mxf $ZOOKEEPER_RELEASE -C $zoo_instance_dir --strip-components 1
-		dos2unix $zoo_instance_dir/bin/*
-		dos2unix $zoo_instance_dir/conf
+		if [ $WINDOWS_BUILD = 'true' ]; then
+		  dos2unix $zoo_instance_dir/bin/*
+		  dos2unix $zoo_instance_dir/conf/*
+		fi		
         
         zoo_data_dir=$DATAS/data$i
         mkdir $zoo_data_dir
