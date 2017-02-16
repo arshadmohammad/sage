@@ -4,15 +4,14 @@ BASE_DIR=`getBaseDir`
 
 INSTALLATION_BASE_DIR=$BASE_DIR/yarn
 RESOURCE_DIR=$BASE_DIR/resources
-HADOOP_RELEASE=$BASE_DIR/hadoop-3.0.0-SNAPSHOT.tar.gz
-NUMBER_OF_RESOURCEMANAGER=1
+HADOOP_RELEASE=$BASE_DIR//hadoop-2.7.3.tar.gz
+NUMBER_OF_RESOURCEMANAGER=2
 NUMBER_OF_NODEMANAGER=3
 
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
-THIS_MACHINE_IP=192.168.1.3
 # is the release from hadoop branch-2
-HADOOP2=false
+HADOOP2=true
 
 install_yarn()
 {
@@ -81,33 +80,44 @@ do
     node_instance_dir=$INSTANCES/resourceManager$i
     node_data_dir=$DATAS/resourceManagerData$i
     core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
+	hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
     yarn_site_xml=$node_instance_dir/etc/hadoop/yarn-site.xml    
     yarn_env=$node_instance_dir/etc/hadoop/yarn-env.sh
-    
-    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://$THIS_MACHINE_IP:$NAMENODE_IPC_ADDRESS_BASE"  
+	
+	## hdfs cofig
+	addAllXMLProperty $core_site_xml "hbase.core.properties"	
+	addAllXMLProperty $hdfs_site_xml "hbase.hdfs.properties"   
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
-    addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir"
+    addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir"    
     
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.hostname" "0.0.0.0"
+	#Static RM properties
+    addAllXMLProperty $yarn_site_xml "yarn.rm.properties"  
+	
+	addXMLProperty $yarn_site_xml "yarn.resourcemanager.ha.id" "rm"$i
+	addXMLProperty $yarn_site_xml "yarn.resourcemanager.zk-address" "$THIS_MACHINE_IP:2181,$THIS_MACHINE_IP:2182,$THIS_MACHINE_IP:2183"
+	
+    resourcemanager_scheduler_port1=$(($RESOURCEMANAGER_SCHEDULER_ADDRESS_BASE))
+	resourcemanager_scheduler_port2=$(($RESOURCEMANAGER_SCHEDULER_ADDRESS_BASE + 1))
+    addXMLProperty $yarn_site_xml "yarn.resourcemanager.scheduler.address.rm1" "$THIS_MACHINE_IP:$resourcemanager_scheduler_port1"
+	addXMLProperty $yarn_site_xml "yarn.resourcemanager.scheduler.address.rm2" "$THIS_MACHINE_IP:$resourcemanager_scheduler_port2"    
     
-    resourcemanager_port=$(($RESOURCEMANAGER_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_port"
+    resourcemanager_admin_address_port1=$(($RESOURCEMANAGER_ADMIN_ADDRESS_BASE))
+	resourcemanager_admin_address_port2=$(($RESOURCEMANAGER_ADMIN_ADDRESS_BASE + 1))
+    addXMLProperty $yarn_site_xml "yarn.resourcemanager.admin.address.rm1" "$THIS_MACHINE_IP:$resourcemanager_admin_address_port1"
+	addXMLProperty $yarn_site_xml "yarn.resourcemanager.admin.address.rm2" "$THIS_MACHINE_IP:$resourcemanager_admin_address_port2"
     
-    resourcemanager_scheduler_port=$(($RESOURCEMANAGER_SCHEDULER_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.scheduler.address" "$THIS_MACHINE_IP:$resourcemanager_scheduler_port"
-    
-    resourcemanager_resource_tracker_port=$(($RESOURCEMANAGER_RESOURCE_TRACKER_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.resource-tracker.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_resource_tracker_port"
-    
-    resourcemanager_admin_address_port=$(($RESOURCEMANAGER_ADMIN_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.admin.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_admin_address_port"
-    
-    resourcemanager_webapp_address_port=$(($RESOURCEMANAGER_WEBAPP_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.resourcemanager.webapp.address" "\${yarn.resourcemanager.hostname}:$resourcemanager_webapp_address_port"
+    resourcemanager_webapp_address_port1=$(($RESOURCEMANAGER_WEBAPP_ADDRESS_BASE))
+	resourcemanager_webapp_address_port2=$(($RESOURCEMANAGER_WEBAPP_ADDRESS_BASE + 1))
+    addXMLProperty $yarn_site_xml "yarn.resourcemanager.webapp.address.rm1" "$THIS_MACHINE_IP:$resourcemanager_webapp_address_port1"
+	addXMLProperty $yarn_site_xml "yarn.resourcemanager.webapp.address.rm2" "$THIS_MACHINE_IP:$resourcemanager_webapp_address_port2"
     
     #Env configuration
+	VAR_PREFIX="HADOOP"
+    if [ $HADOOP2 = 'true' ]; then
+	    VAR_PREFIX="YARN"
+	  fi
     pidDir=$node_data_dir/pid
     mkdir $pidDir
     addProperty $yarn_env $VAR_PREFIX"_PID_DIR" "$pidDir"
@@ -129,20 +139,22 @@ do
     node_instance_dir=$INSTANCES/nodeManager$i
     node_data_dir=$DATAS/nodeManagerData$i
     core_site_xml=$node_instance_dir/etc/hadoop/core-site.xml
+	hdfs_site_xml=$node_instance_dir/etc/hadoop/hdfs-site.xml
     yarn_site_xml=$node_instance_dir/etc/hadoop/yarn-site.xml    
     yarn_env=$node_instance_dir/etc/hadoop/yarn-env.sh
     
-    addXMLProperty $core_site_xml "fs.defaultFS" "hdfs://$THIS_MACHINE_IP:$NAMENODE_IPC_ADDRESS_BASE"  
+    ## hdfs cofig
+	addAllXMLProperty $core_site_xml "hbase.core.properties"	
+	addAllXMLProperty $hdfs_site_xml "hbase.hdfs.properties"  
     
     tempDir=$node_data_dir/temp
     mkdir $tempDir
-    addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir"
-    
-    addXMLProperty $yarn_site_xml "yarn.nodemanager.hostname" "0.0.0.0"
-    
-    nodemanager_address_port=$(($NODEMANAGER_ADDRESS_BASE + $i - 1))
-    addXMLProperty $yarn_site_xml "yarn.nodemanager.address" "\${yarn.nodemanager.hostname}:$nodemanager_address_port"
-    
+    addXMLProperty $core_site_xml "hadoop.tmp.dir" "$tempDir" 
+	
+	#Resource Manager and node manger static properties
+	addAllXMLProperty $yarn_site_xml "yarn.rm.properties"	
+	addAllXMLProperty $yarn_site_xml "yarn.nm.properties"
+              
     nodemanager_localizer_address_port=$(($NODEMANAGER_LOCALIZER_ADDRESS_BASE + $i - 1))
     addXMLProperty $yarn_site_xml "yarn.nodemanager.localizer.address" "\${yarn.nodemanager.hostname}:$nodemanager_localizer_address_port"
     
