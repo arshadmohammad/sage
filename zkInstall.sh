@@ -3,11 +3,12 @@ source commonScript.sh
 BASE_DIR=`getBaseDir`
 INSTALLATION_BASE_DIR=$BASE_DIR/zk
 RESOURCE_DIR=$BASE_DIR/resources
-ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.5.3-alpha-SNAPSHOT.tar.gz
+ZOOKEEPER_RELEASE=$BASE_DIR/zookeeper-3.6.0-SNAPSHOT.tar.gz
 NUMBER_OF_INSTANCES=3
 DATAS=$INSTALLATION_BASE_DIR/datas
 INSTANCES=$INSTALLATION_BASE_DIR/instances
 AUTHENTION=true
+DIGEST_AUTHENTION=true
 SECURE=true
 BRANCH_3_4=false
 install_zookeeper()
@@ -73,9 +74,16 @@ configure_zookeeper()
       cp  $dynamic_config_file $zoo_instance_dir/conf/
       if [ $AUTHENTION = 'true' ]; then
         cp  $RESOURCE_DIR/common/hadoop.keytab $zoo_instance_dir/conf/
-        cp  $RESOURCE_DIR/zookeeper/jaas.conf $zoo_instance_dir/conf/
-        cp  $RESOURCE_DIR/common/krb5.conf $zoo_instance_dir/conf/
-        sed -i "s|keyTab=.*|keyTab=\"$zoo_instance_dir/conf/hadoop.keytab\"|" $zoo_instance_dir/conf/jaas.conf
+		cp  $RESOURCE_DIR/common/krb5.conf $zoo_instance_dir/conf/
+		
+		if [ $DIGEST_AUTHENTION = 'true' ]; then
+		 cp  $RESOURCE_DIR/zookeeper/jaas-digest.conf $zoo_instance_dir/conf/jaas.conf
+		else
+		 cp  $RESOURCE_DIR/zookeeper/jaas.conf $zoo_instance_dir/conf/
+		 sed -i "s|keyTab=.*|keyTab=\"$zoo_instance_dir/conf/hadoop.keytab\"|" $zoo_instance_dir/conf/jaas.conf
+		fi     
+        
+        
       fi      
       if [ $SECURE = 'true' ]; then
         cp  $RESOURCE_DIR/common/keystore $zoo_instance_dir/conf/
